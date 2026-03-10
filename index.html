@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Lumina — Find Papers That Matter</title>
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;700;900&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Permanent+Marker&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --paper: #f2ece0;
+      --paper2: #ede6d6;
+      --paper3: #e6ddc8;
+      --ink: #1a1008;
+      --ink-mid: #3d2e18;
+      --ink-faint: #8a7560;
+      --yellow: #ffe535;
+      --yellow2: #ffd700;
+      --red: #d62828;
+      --blue-ink: #1a3a6b;
+      --stamp-green: #2d6a2d;
+      --stamp-red: #a01515;
+      --stamp-blue: #0a3580;
+      --stamp-purple: #4a1a6b;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: 'Courier Prime', 'Courier New', monospace;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* GRAIN TEXTURE */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.06;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 256px 256px;
+    }
+
+    /* RULED LINES on body */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background-image: repeating-linear-gradient(
+        transparent,
+        transparent 27px,
+        rgba(26,16,8,0.04) 27px,
+        rgba(26,16,8,0.04) 28px
+      );
+    }
+
+    /* HIGHLIGHT UTILITY */
+    .hl {
+      background: linear-gradient(120deg, var(--yellow) 0%, var(--yellow2) 100%);
+      padding: 0 4px 2px;
+      border-radius: 2px;
+      display: inline;
+    }
+
+    /* ═══ NAV ═══ */
+    nav {
+      position: relative;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 48px;
+      border-bottom: 3px solid var(--ink);
+    }
+
+    .logo-wrap {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+    }
+
+    .logo-main {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 48px;
+      font-weight: 900;
+      line-height: 1;
+      color: var(--ink);
+      letter-spacing: -0.03em;
+    }
+
+    .logo-sub {
+      font-family: 'Courier Prime', monospace;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 8px;
+      padding-left: 2px;
+    }
+
+    .nav-sources {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .nav-stamp {
+      font-family: 'Courier Prime', monospace;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      border: 2px solid var(--ink-faint);
+      padding: 4px 10px;
+      border-radius: 2px;
+      color: var(--ink-faint);
+      transform: rotate(-1deg);
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .nav-stamp:nth-child(2) { transform: rotate(0.8deg); }
+    .nav-stamp:nth-child(3) { transform: rotate(-0.5deg); }
+    .nav-stamp:nth-child(4) { transform: rotate(1.2deg); }
+    .nav-stamp:hover { border-color: var(--ink); color: var(--ink); }
+
+    /* ═══ HERO ═══ */
+    .hero {
+      position: relative;
+      z-index: 10;
+      padding: 72px 48px 64px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .hero-kicker {
+      font-family: 'Courier Prime', monospace;
+      font-size: 11px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .kicker-dash {
+      display: inline-block;
+      width: 32px;
+      height: 2px;
+      background: var(--ink-faint);
+    }
+
+    .hero-h1 {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: clamp(64px, 11vw, 140px);
+      font-weight: 900;
+      line-height: 0.88;
+      letter-spacing: -0.04em;
+      color: var(--ink);
+      margin-bottom: 32px;
+    }
+
+    .hero-h1 .line2 {
+      display: block;
+      margin-left: 80px;
+      color: var(--ink);
+    }
+
+    .hero-h1 .line3 {
+      display: block;
+      margin-left: 160px;
+    }
+
+    .hero-desc {
+      max-width: 520px;
+      font-size: 14px;
+      line-height: 1.9;
+      color: var(--ink-mid);
+      margin-bottom: 48px;
+      margin-left: 4px;
+    }
+
+    /* margin annotation */
+    .annotation {
+      position: absolute;
+      font-family: 'Permanent Marker', cursive;
+      color: var(--blue-ink);
+      font-size: 15px;
+      transform: rotate(-12deg);
+      pointer-events: none;
+      opacity: 0.75;
+    }
+
+    .annot-1 { top: 96px; right: 60px; font-size: 18px; transform: rotate(8deg); }
+    .annot-2 { top: 220px; right: 80px; font-size: 13px; transform: rotate(-6deg); color: var(--red); }
+
+    /* ═══ SEARCH ═══ */
+    .search-wrap {
+      position: relative;
+      z-index: 10;
+      max-width: 860px;
+      margin: 0 auto 0;
+      padding: 0 48px 60px;
+    }
+
+    .search-label {
+      font-family: 'Courier Prime', monospace;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 10px;
+    }
+
+    .search-row {
+      display: flex;
+      border: 3px solid var(--ink);
+      background: white;
+      box-shadow: 5px 5px 0 var(--ink);
+      transition: box-shadow 0.15s;
+    }
+
+    .search-row:focus-within {
+      box-shadow: 7px 7px 0 var(--ink);
+    }
+
+    .search-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 18px 20px;
+      font-family: 'Courier Prime', monospace;
+      font-size: 15px;
+      color: var(--ink);
+      font-style: italic;
+    }
+
+    .search-input::placeholder { color: #b0a090; }
+
+    .search-btn {
+      background: var(--ink);
+      border: none;
+      padding: 0 36px;
+      cursor: pointer;
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--paper);
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+
+    .search-btn:hover { background: var(--yellow); color: var(--ink); }
+    .search-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .search-hint {
+      font-family: 'Courier Prime', monospace;
+      font-size: 11px;
+      color: var(--ink-faint);
+      letter-spacing: 0.1em;
+      margin-top: 10px;
+    }
+
+    /* ═══ TORN EDGE DIVIDER ═══ */
+    .torn-edge {
+      width: 100%;
+      height: 48px;
+      position: relative;
+      z-index: 5;
+      overflow: hidden;
+    }
+
+    .torn-edge svg { width: 100%; height: 100%; display: block; }
+
+    /* ═══ LOADING ═══ */
+    .loading {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 80px 24px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .loading.active { display: flex; }
+
+    .typewriter-line {
+      font-family: 'Courier Prime', monospace;
+      font-size: 16px;
+      color: var(--ink-mid);
+      letter-spacing: 0.08em;
+    }
+
+    .cursor-blink {
+      display: inline-block;
+      width: 10px;
+      height: 18px;
+      background: var(--ink);
+      margin-left: 2px;
+      vertical-align: middle;
+      animation: blink 0.8s step-end infinite;
+    }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    .loading-sub {
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+
+    /* ═══ RESULTS SECTION ═══ */
+    .results-section {
+      display: none;
+      position: relative;
+      z-index: 10;
+      padding: 0 48px 80px;
+      max-width: 1060px;
+      margin: 0 auto;
+    }
+
+    .results-bar {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 32px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--ink);
+    }
+
+    .results-num {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 52px;
+      font-weight: 900;
+      line-height: 1;
+      color: var(--ink);
+      letter-spacing: -0.04em;
+    }
+
+    .results-label {
+      font-family: 'Courier Prime', monospace;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+
+    .results-query {
+      font-style: italic;
+      color: var(--ink-mid);
+      margin-left: auto;
+      font-size: 13px;
+    }
+
+    /* ── PAPER CARD ── */
+    .paper-card {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      background: white;
+      border: 2px solid var(--ink);
+      padding: 28px 32px;
+      margin-bottom: 16px;
+      box-shadow: 4px 4px 0 var(--ink);
+      transition: box-shadow 0.15s, transform 0.15s;
+      animation: cardDrop 0.35s ease both;
+      position: relative;
+    }
+
+    /* Paperclip accent */
+    .paper-card::before {
+      content: '📎';
+      position: absolute;
+      top: -14px;
+      right: 24px;
+      font-size: 22px;
+      transform: rotate(12deg);
+    }
+
+    .paper-card:hover {
+      box-shadow: 6px 6px 0 var(--ink);
+      transform: translate(-2px, -2px);
+    }
+
+    @keyframes cardDrop {
+      from { opacity: 0; transform: translateY(12px) rotate(0.5deg); }
+      to   { opacity: 1; transform: translateY(0) rotate(0); }
+    }
+
+    .paper-card:nth-child(1){animation-delay:0.04s}
+    .paper-card:nth-child(2){animation-delay:0.10s}
+    .paper-card:nth-child(3){animation-delay:0.16s}
+    .paper-card:nth-child(4){animation-delay:0.22s}
+    .paper-card:nth-child(5){animation-delay:0.28s}
+    .paper-card:nth-child(6){animation-delay:0.34s}
+    .paper-card:nth-child(7){animation-delay:0.40s}
+    .paper-card:nth-child(8){animation-delay:0.46s}
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      margin-bottom: 10px;
+    }
+
+    .paper-title {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1.25;
+      color: var(--ink);
+      flex: 1;
+      letter-spacing: -0.01em;
+    }
+
+    .score-stamp {
+      flex-shrink: 0;
+      border: 3px solid var(--ink);
+      width: 58px;
+      height: 58px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transform: rotate(2deg);
+      position: relative;
+    }
+
+    .score-stamp.high { border-color: var(--stamp-green); }
+    .score-stamp.mid  { border-color: var(--stamp-blue); }
+    .score-stamp.low  { border-color: var(--ink-faint); }
+
+    .score-stamp::before {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border: 1px solid currentColor;
+      opacity: 0.3;
+    }
+
+    .score-val {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 26px;
+      font-weight: 900;
+      line-height: 1;
+      color: var(--ink);
+    }
+
+    .score-stamp.high .score-val { color: var(--stamp-green); }
+    .score-stamp.mid  .score-val { color: var(--stamp-blue); }
+    .score-stamp.low  .score-val { color: var(--ink-faint); }
+
+    .score-of {
+      font-family: 'Courier Prime', monospace;
+      font-size: 8px;
+      letter-spacing: 0.1em;
+      color: var(--ink-faint);
+    }
+
+    .paper-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .meta-authors {
+      font-size: 11px;
+      color: var(--ink-mid);
+      font-style: italic;
+    }
+
+    .meta-sep { color: var(--ink-faint); font-size: 11px; }
+
+    .meta-year {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--ink-mid);
+      letter-spacing: 0.05em;
+    }
+
+    .meta-journal {
+      font-size: 11px;
+      color: var(--ink-faint);
+      font-style: italic;
+    }
+
+    /* rubber stamp source tags */
+    .src-stamp {
+      font-family: 'Courier Prime', monospace;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 700;
+      padding: 2px 8px;
+      border: 1.5px solid;
+      border-radius: 2px;
+      transform: rotate(-1deg);
+      display: inline-block;
+    }
+
+    .src-arxiv    { color: var(--stamp-red);    border-color: var(--stamp-red); }
+    .src-semantic { color: var(--stamp-blue);   border-color: var(--stamp-blue); }
+    .src-pubmed   { color: var(--stamp-green);  border-color: var(--stamp-green); }
+    .src-crossref { color: var(--stamp-purple); border-color: var(--stamp-purple); }
+
+    .paper-abstract {
+      font-size: 13px;
+      line-height: 1.85;
+      color: var(--ink-mid);
+      margin-bottom: 18px;
+      padding-left: 14px;
+      border-left: 3px solid var(--yellow);
+    }
+
+    .card-footer {
+      border-top: 1px dashed var(--ink-faint);
+      padding-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .insight-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      font-size: 12px;
+      color: var(--ink-mid);
+      line-height: 1.7;
+    }
+
+    .insight-label {
+      font-size: 8px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 700;
+      white-space: nowrap;
+      margin-top: 2px;
+      padding: 2px 6px;
+      border: 1px solid;
+    }
+
+    .lbl-contrib { color: var(--stamp-red);  border-color: var(--stamp-red); }
+    .lbl-why     { color: var(--blue-ink);   border-color: var(--blue-ink); background: rgba(255,229,53,0.35); }
+
+    /* ── LOAD MORE ── */
+    .load-more-wrap {
+      text-align: center;
+      padding: 32px 0;
+    }
+
+    .load-more-btn {
+      background: transparent;
+      border: 3px solid var(--ink);
+      color: var(--ink);
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 14px 40px;
+      cursor: pointer;
+      box-shadow: 4px 4px 0 var(--ink);
+      transition: box-shadow 0.15s, transform 0.15s, background 0.15s;
+    }
+
+    .load-more-btn:hover {
+      background: var(--yellow);
+      box-shadow: 6px 6px 0 var(--ink);
+      transform: translate(-1px, -1px);
+    }
+
+    .load-more-count {
+      font-family: 'Courier Prime', monospace;
+      font-size: 11px;
+      color: var(--ink-faint);
+      letter-spacing: 0.1em;
+      margin-top: 10px;
+    }
+
+    /* ── ERROR ── */
+    .error-msg {
+      display: none;
+      text-align: center;
+      padding: 48px;
+      border: 3px solid var(--ink);
+      max-width: 480px;
+      margin: 20px auto;
+      background: white;
+      box-shadow: 6px 6px 0 var(--ink);
+      position: relative;
+      z-index: 10;
+    }
+    .error-msg.active { display: block; }
+    .error-glyph { font-size: 40px; margin-bottom: 14px; }
+    .error-title {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 28px;
+      font-weight: 900;
+      margin-bottom: 8px;
+    }
+    .error-sub { font-size: 13px; color: var(--ink-faint); font-style: italic; }
+
+    /* ═══ CAREERS CORKBOARD ═══ */
+    .careers-section {
+      position: relative;
+      z-index: 10;
+      background: #c8a87a;
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.04) 0px, rgba(0,0,0,0.04) 1px, transparent 1px, transparent 24px),
+        repeating-linear-gradient(90deg, rgba(0,0,0,0.03) 0px, rgba(0,0,0,0.03) 1px, transparent 1px, transparent 24px);
+      border-top: 6px solid #7a5c2e;
+      border-bottom: 6px solid #7a5c2e;
+      padding: 64px 48px 80px;
+      text-align: center;
+    }
+
+    .cork-header {
+      margin-bottom: 48px;
+    }
+
+    .cork-eyebrow {
+      font-family: 'Courier Prime', monospace;
+      font-size: 10px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #5a3e1a;
+      margin-bottom: 12px;
+      opacity: 0.8;
+    }
+
+    .cork-heading {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: clamp(32px, 5vw, 60px);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: #2a1a08;
+      line-height: 1.1;
+    }
+
+    .cork-heading .hl {
+      background: linear-gradient(120deg, #ffe535 0%, #ffd700 100%);
+    }
+
+    /* Index card */
+    .career-card-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 32px;
+      min-height: 200px;
+      align-items: center;
+    }
+
+    .career-index-card {
+      background: #fffef5;
+      border: 2px solid #c0a060;
+      padding: 28px 36px 24px;
+      max-width: 420px;
+      width: 100%;
+      position: relative;
+      box-shadow: 3px 3px 12px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.8);
+      transition: opacity 0.4s;
+    }
+
+    /* Pin */
+    .career-index-card::before {
+      content: '';
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #ff6b6b, #cc0000);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+
+    /* Card ruled lines */
+    .career-index-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        transparent, transparent 30px,
+        rgba(100,120,200,0.12) 30px, rgba(100,120,200,0.12) 31px
+      );
+      pointer-events: none;
+    }
+
+    .career-emoji {
+      font-size: 44px;
+      display: block;
+      margin-bottom: 10px;
+      animation: pinFloat 3s ease-in-out infinite;
+      position: relative;
+      z-index: 1;
+      transition: opacity 0.4s;
+    }
+
+    @keyframes pinFloat {
+      0%,100% { transform: translateY(0) rotate(-1deg); }
+      50%      { transform: translateY(-6px) rotate(1deg); }
+    }
+
+    .career-name-text {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 28px;
+      font-weight: 900;
+      color: #1a1008;
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+      position: relative;
+      z-index: 1;
+      transition: opacity 0.4s;
+    }
+
+    .career-desc-text {
+      font-family: 'Courier Prime', monospace;
+      font-size: 12px;
+      color: #5a4020;
+      line-height: 1.8;
+      font-style: italic;
+      position: relative;
+      z-index: 1;
+      transition: opacity 0.4s;
+    }
+
+    .career-dots-row {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    .c-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #7a5c2e;
+      cursor: pointer;
+      opacity: 0.35;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .c-dot.active {
+      opacity: 1;
+      transform: scale(1.4);
+      background: #2a1a08;
+    }
+
+    /* ═══ FOOTER ═══ */
+    footer {
+      position: relative;
+      z-index: 10;
+      background: var(--ink);
+      color: var(--paper);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 48px;
+    }
+
+    .footer-name {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: var(--yellow);
+    }
+
+    .footer-note {
+      font-family: 'Courier Prime', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      opacity: 0.45;
+    }
+
+    @media (max-width: 640px) {
+      nav { padding: 16px 20px; }
+      .nav-sources { display: none; }
+      .hero { padding: 40px 20px 32px; }
+      .search-wrap { padding: 0 20px 40px; }
+      .results-section { padding: 0 20px 60px; }
+      .paper-card { padding: 20px; }
+      .careers-section { padding: 40px 20px 60px; }
+      footer { flex-direction: column; gap: 8px; padding: 20px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo-wrap">
+    <span class="logo-main">Lumina</span>
+    <div>
+      <div class="logo-sub">Research Engine</div>
+    </div>
+  </div>
+  <div class="nav-sources">
+    <span class="nav-stamp">arXiv</span>
+    <span class="nav-stamp">Semantic Scholar</span>
+    <span class="nav-stamp">PubMed</span>
+    <span class="nav-stamp">CrossRef</span>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="annotation annot-1">for students ↓</div>
+  <div class="annotation annot-2">★ AI-ranked!</div>
+
+  <div class="hero-kicker">
+    <span class="kicker-dash"></span>
+    Academic paper search
+    <span class="kicker-dash"></span>
+  </div>
+
+  <h1 class="hero-h1">
+    Find<span class="line2">the</span><span class="line3"><span class="hl">right</span> paper.</span>
+  </h1>
+
+  <p class="hero-desc">
+    Type your research topic. Lumina searches four academic databases,
+    reads every abstract, and returns only the papers that <strong>genuinely matter</strong> — ranked by AI relevance so you stop wasting time.
+  </p>
+</div>
+
+<!-- SEARCH -->
+<div class="search-wrap">
+  <div class="search-label">→ What are you researching?</div>
+  <div class="search-row">
+    <input class="search-input" type="text" id="search-input"
+      placeholder="e.g. deep learning for protein folding…"
+      autocomplete="off"/>
+    <button class="search-btn" id="search-btn" onclick="doSearch()">Search →</button>
+  </div>
+  <div class="search-hint">↵  Enter or click Search &nbsp;·&nbsp; Results ranked by AI</div>
+</div>
+
+<!-- TORN EDGE -->
+<div class="torn-edge">
+  <svg viewBox="0 0 1440 48" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M0,0 L0,28 Q30,48 60,30 Q90,12 130,36 Q165,52 200,28 Q235,8 270,34 Q305,54 340,26 Q375,4 415,32 Q450,52 490,24 Q525,2 560,38 Q595,58 635,22 Q670,0 710,36 Q745,58 785,20 Q820,0 860,40 Q895,62 935,18 Q970,0 1010,38 Q1045,60 1085,22 Q1120,2 1160,44 Q1195,62 1235,20 Q1270,0 1310,36 Q1345,58 1380,24 Q1415,6 1440,28 L1440,0 Z"
+          fill="#f2ece0"/>
+  </svg>
+</div>
+
+<!-- LOADING -->
+<div class="loading" id="loading">
+  <div class="typewriter-line">Searching databases<span class="cursor-blink"></span></div>
+  <div class="loading-sub">15–25 seconds · reading every abstract</div>
+</div>
+
+<!-- ERROR -->
+<div class="error-msg" id="error-msg">
+  <div class="error-glyph">✗</div>
+  <div class="error-title" id="error-title">Something broke.</div>
+  <div class="error-sub" id="error-sub">Make sure app.py is running on port 5001.</div>
+</div>
+
+<!-- RESULTS -->
+<div class="results-section" id="results-section">
+  <div class="results-bar">
+    <span class="results-num" id="results-num"></span>
+    <div>
+      <div class="results-label">papers surfaced</div>
+      <div class="results-query" id="results-query"></div>
+    </div>
+  </div>
+  <div id="results"></div>
+</div>
+
+<!-- CORK BOARD CAREERS -->
+<div class="careers-section">
+  <div class="cork-header">
+    <div class="cork-eyebrow">— Where this takes you —</div>
+    <div class="cork-heading">Today's research.<br>Tomorrow's <span class="hl" id="career-inline">career</span>.</div>
+  </div>
+
+  <div class="career-card-wrap">
+    <div class="career-index-card">
+      <span class="career-emoji" id="career-icon"></span>
+      <div class="career-name-text" id="career-name"></div>
+      <div class="career-desc-text" id="career-desc"></div>
+    </div>
+  </div>
+
+  <div class="career-dots-row" id="career-dots"></div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <span class="footer-name">Lumina</span>
+  <span class="footer-note">arXiv · Semantic Scholar · PubMed · CrossRef · Groq AI</span>
+</footer>
+
+<script>
+/* SEARCH */
+document.getElementById('search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+function srcClass(s) {
+  return { 'arXiv':'src-arxiv','Semantic Scholar':'src-semantic','PubMed':'src-pubmed','CrossRef':'src-crossref' }[s] || 'src-arxiv';
+}
+
+function scoreClass(s) { return s >= 8 ? 'high' : s >= 5 ? 'mid' : 'low'; }
+
+let allPapers = [], shownCount = 0;
+const PAGE = 8;
+
+async function doSearch() {
+  const topic = document.getElementById('search-input').value.trim();
+  if (!topic) return;
+  const btn = document.getElementById('search-btn');
+  const loading = document.getElementById('loading');
+  const section = document.getElementById('results-section');
+  const el = document.getElementById('results');
+  const err = document.getElementById('error-msg');
+
+  btn.disabled = true;
+  loading.classList.add('active');
+  section.style.display = 'none';
+  el.innerHTML = '';
+  err.classList.remove('active');
+  loading.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  try {
+    const res = await fetch('/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic }),
+    });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    loading.classList.remove('active');
+
+    if (!data.results || !data.results.length) {
+      document.getElementById('error-title').textContent = 'Nothing found.';
+      document.getElementById('error-sub').textContent = 'Try different keywords or a broader topic.';
+      err.classList.add('active');
+      return;
+    }
+
+    document.getElementById('results-num').textContent = data.results.length;
+    document.getElementById('results-query').textContent = '"' + topic + '"';
+    allPapers = data.results;
+    shownCount = 0;
+    const lm = document.getElementById('load-more-wrap');
+    if (lm) lm.remove();
+    renderBatch();
+    section.style.display = 'block';
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch {
+    loading.classList.remove('active');
+    err.classList.add('active');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function makeCard(p) {
+  const card = document.createElement('a');
+  card.className = 'paper-card';
+  card.href = p.link || '#';
+  card.target = '_blank';
+  card.rel = 'noopener noreferrer';
+  const authors = (p.authors || []).join(', ') || 'Unknown authors';
+  const sc = scoreClass(p.score);
+  card.innerHTML =
+    '<div class="card-top">' +
+      '<div class="paper-title">' + p.title + '</div>' +
+      '<div class="score-stamp ' + sc + '"><div class="score-val">' + p.score + '</div><div class="score-of">/10</div></div>' +
+    '</div>' +
+    '<div class="paper-meta">' +
+      '<span class="meta-authors">' + authors + '</span>' +
+      (p.year ? '<span class="meta-sep"> · </span><span class="meta-year">' + p.year + '</span>' : '') +
+      (p.journal ? '<span class="meta-sep"> · </span><span class="meta-journal">' + p.journal + '</span>' : '') +
+      '<span class="meta-sep"> · </span>' +
+      '<span class="src-stamp ' + srcClass(p.source) + '">' + p.source + '</span>' +
+    '</div>' +
+    (p.abstract ? '<div class="paper-abstract">' + p.abstract + '…</div>' : '') +
+    '<div class="card-footer">' +
+      (p.key_contribution ? '<div class="insight-row"><span class="insight-label lbl-contrib">What it found</span><span>' + p.key_contribution + '</span></div>' : '') +
+      (p.relevance ? '<div class="insight-row"><span class="insight-label lbl-why">Why it helps</span><span>' + p.relevance + '</span></div>' : '') +
+    '</div>';
+  return card;
+}
+
+function renderBatch() {
+  const el = document.getElementById('results');
+  const start = el.children.length;
+  allPapers.slice(start, start + PAGE).forEach(p => el.appendChild(makeCard(p)));
+  updateLoadMore(el.children.length);
+}
+
+function updateLoadMore(shown) {
+  const old = document.getElementById('load-more-wrap');
+  if (old) old.remove();
+  const rem = allPapers.length - shown;
+  if (rem <= 0) return;
+  const wrap = document.createElement('div');
+  wrap.id = 'load-more-wrap';
+  wrap.className = 'load-more-wrap';
+  wrap.innerHTML =
+    '<button class="load-more-btn" onclick="renderBatch()">Load ' + Math.min(rem, PAGE) + ' more papers ↓</button>' +
+    '<div class="load-more-count">' + rem + ' remaining</div>';
+  document.getElementById('results').after(wrap);
+}
+
+/* CAREERS */
+const careers = [
+  { icon:'🔬', name:'Research Scientist',       desc:'Conduct experiments and publish findings that push the boundaries of human knowledge.',               inline:'Research Scientist' },
+  { icon:'👩‍⚕️', name:'Medical Doctor',           desc:'Use evidence-based research to diagnose, treat, and improve patient outcomes every day.',            inline:'Medical Doctor' },
+  { icon:'🤖', name:'AI Engineer',              desc:'Build intelligent systems powered by the machine learning papers you study today.',                  inline:'AI Engineer' },
+  { icon:'⚖️', name:'Policy Analyst',           desc:'Shape government decisions and public policy grounded in rigorous academic research.',                inline:'Policy Analyst' },
+  { icon:'🌍', name:'Climate Scientist',         desc:'Study the environment and develop solutions to protect our planet for future generations.',          inline:'Climate Scientist' },
+  { icon:'💊', name:'Pharmacologist',            desc:'Discover and develop new drugs and treatments that save millions of lives worldwide.',               inline:'Pharmacologist' },
+  { icon:'📊', name:'Data Scientist',            desc:'Transform raw data into insights that drive decisions at companies, hospitals, and governments.',    inline:'Data Scientist' },
+  { icon:'🧬', name:'Geneticist',               desc:'Decode the blueprint of life and develop breakthroughs in personalised medicine.',                  inline:'Geneticist' },
+  { icon:'🏗️', name:'Civil Engineer',           desc:'Design infrastructure that connects communities and improves quality of life for millions.',        inline:'Civil Engineer' },
+  { icon:'📡', name:'Astrophysicist',            desc:'Explore the cosmos — from black holes to exoplanets — expanding what humanity knows.',              inline:'Astrophysicist' },
+  { icon:'🧠', name:'Neuroscientist',            desc:'Unravel the mysteries of the human brain and develop treatments for mental health disorders.',       inline:'Neuroscientist' },
+  { icon:'💻', name:'Software Engineer',         desc:'Build the technology that billions of people use to learn, communicate, and solve problems.',       inline:'Software Engineer' },
+  { icon:'🏛️', name:'Lawyer',                   desc:'Use legal research and critical thinking to defend rights, shape policy, and deliver justice.',      inline:'Lawyer' },
+  { icon:'📰', name:'Investigative Journalist',  desc:'Uncover hidden truths and hold power accountable using data, research, and storytelling.',         inline:'Investigative Journalist' },
+  { icon:'🎓', name:'University Professor',      desc:'Inspire the next generation of thinkers while publishing research that shapes your field.',         inline:'University Professor' },
+  { icon:'🏦', name:'Economist',                 desc:'Analyse markets, trade, and policy to help governments and businesses make smarter decisions.',    inline:'Economist' },
+  { icon:'🛡️', name:'Cybersecurity Analyst',    desc:'Protect critical systems and personal data using cutting-edge research in digital security.',      inline:'Cybersecurity Analyst' },
+  { icon:'🧪', name:'Biochemist',               desc:'Study chemical processes in living organisms to develop medicines and understand disease.',         inline:'Biochemist' },
+  { icon:'🏥', name:'Public Health Officer',     desc:'Design health interventions and policies that protect entire populations from disease.',            inline:'Public Health Officer' },
+  { icon:'🌱', name:'Environmental Engineer',    desc:'Develop clean energy solutions and sustainable systems to reduce environmental impact.',           inline:'Environmental Engineer' },
+  { icon:'🧑‍💼', name:'Psychologist',            desc:'Use behavioural science research to help people understand their minds and improve mental health.',  inline:'Psychologist' },
+  { icon:'🚀', name:'Aerospace Engineer',        desc:'Design the aircraft and spacecraft that push humanity beyond the limits of Earth.',                 inline:'Aerospace Engineer' },
+  { icon:'🗺️', name:'Urban Planner',            desc:'Use social science research to design cities that are safe, equitable, and sustainable.',           inline:'Urban Planner' },
+  { icon:'💉', name:'Epidemiologist',            desc:'Track and model how diseases spread through populations to prevent the next global outbreak.',      inline:'Epidemiologist' },
+  { icon:'🔭', name:'Cosmologist',              desc:'Investigate the origin, structure, and ultimate fate of the universe itself.',                      inline:'Cosmologist' },
+  { icon:'🤝', name:'Development Economist',    desc:'Use rigorous research to design programmes that lift communities out of poverty worldwide.',        inline:'Development Economist' },
+  { icon:'🏋️', name:'Sports Scientist',         desc:'Apply biomechanics and physiology research to help athletes perform at their very best.',          inline:'Sports Scientist' },
+  { icon:'🌊', name:'Marine Biologist',          desc:'Explore ocean ecosystems and protect the species that keep our seas alive and healthy.',           inline:'Marine Biologist' },
+  { icon:'🧑‍🍳', name:'Food Scientist',          desc:'Use chemistry and nutrition research to develop healthier, safer, and more sustainable food.',     inline:'Food Scientist' },
+  { icon:'🤲', name:'Social Worker',             desc:'Apply evidence-based research to support vulnerable individuals and communities.',                  inline:'Social Worker' },
+  { icon:'🏺', name:'Archaeologist',             desc:'Uncover artefacts and sites that reveal how human civilisations lived and evolved.',               inline:'Archaeologist' },
+  { icon:'📱', name:'UX Researcher',             desc:'Study human behaviour to design technology that is intuitive, inclusive, and genuinely helpful.',  inline:'UX Researcher' },
+  { icon:'🧑‍🔧', name:'Biomedical Engineer',    desc:'Invent medical devices and diagnostic tools that transform how doctors treat patients.',           inline:'Biomedical Engineer' },
+  { icon:'🌐', name:'Int\'l Relations Specialist',desc:'Shape diplomacy and global policy using deep research into history, politics, and economics.',   inline:'Int\'l Relations Specialist' },
+  { icon:'📚', name:'Librarian & Archivist',     desc:'Preserve and organise human knowledge so researchers everywhere can access it freely.',            inline:'Librarian & Archivist' },
+];
+
+let currentCareer = 0;
+
+function initCareers() {
+  const dots = document.getElementById('career-dots');
+  careers.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'c-dot' + (i === 0 ? ' active' : '');
+    d.onclick = () => showCareer(i);
+    dots.appendChild(d);
+  });
+  showCareer(0);
+}
+
+function showCareer(i) {
+  const icon  = document.getElementById('career-icon');
+  const name  = document.getElementById('career-name');
+  const desc  = document.getElementById('career-desc');
+  const inl   = document.getElementById('career-inline');
+  [icon,name,desc].forEach(e => e.style.opacity='0');
+  setTimeout(() => {
+    icon.textContent = careers[i].icon;
+    name.textContent = careers[i].name;
+    desc.textContent = careers[i].desc;
+    inl.textContent  = careers[i].inline;
+    [icon,name,desc].forEach(e => e.style.opacity='1');
+    currentCareer = i;
+    document.querySelectorAll('.c-dot').forEach((d,j) => d.classList.toggle('active', j===i));
+  }, 350);
+}
+
+initCareers();
+setInterval(() => showCareer((currentCareer + 1) % careers.length), 4000);
+</script>
+</body>
+</html>
