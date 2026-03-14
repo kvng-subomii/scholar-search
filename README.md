@@ -22,11 +22,17 @@ I finished university in 2025. I built Lumina because no tool existed that did t
 
 Lumina searches **four academic databases simultaneously**, reads every result using an AI, and returns only the papers genuinely relevant to your research topic — each one scored, explained, and linked.
 
-**Sources searched:**
+**Sources searched (10 databases):**
 - 📄 **arXiv** — preprints across STEM fields
 - 🔬 **Semantic Scholar** — 200M+ papers with semantic understanding
 - 🏥 **PubMed** — biomedical and life sciences
 - 🔗 **CrossRef** — journals and publications across all disciplines
+- 🌍 **AJOL (via OpenAlex)** — African academic journals across all disciplines
+- 🔓 **CORE** — 30M+ open access papers including African institutional repositories
+- 📂 **DOAJ** — Directory of Open Access Journals, peer-reviewed global coverage
+- 🗄️ **BASE** — 300M+ documents from 7000+ academic repositories worldwide
+- 🎓 **ERIC** — education, communication, social science, and psychology research
+- 🧬 **Europe PMC** — life sciences, public health, and psychology
 
 **What you get back for each paper:**
 - A relevance score out of 10 — so you know immediately what to prioritise
@@ -100,7 +106,7 @@ Open your browser at `http://127.0.0.1:5001`
 
 ## Roadmap
 
-- [ ] Add **AJOL (African Journals Online)** — for research on African literature, policy, history, and culture
+- [ ] Google Scholar via SerpAPI (optional paid tier for even broader coverage)
 - [ ] Filter results by year range
 - [ ] Export results as a formatted reference list
 - [ ] Save and revisit past searches

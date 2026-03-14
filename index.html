@@ -364,6 +364,74 @@
       font-size: 13px;
     }
 
+    .subtopics-banner {
+      background: white;
+      border: 2px solid var(--ink);
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      box-shadow: 3px 3px 0 var(--ink);
+    }
+
+    .subtopics-label {
+      font-family: 'Courier Prime', monospace;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 10px;
+    }
+
+    .subtopics-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .subtopic-item {
+      font-family: 'Courier Prime', monospace;
+      font-size: 12px;
+      color: var(--ink-mid);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      line-height: 1.5;
+    }
+
+    .low-results-banner {
+      background: #fffef5;
+      border: 2px dashed var(--ink);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .low-results-icon { font-size: 22px; flex-shrink: 0; }
+    .low-results-text { font-family: 'Courier Prime', monospace; font-size: 12px; color: var(--ink-mid); line-height: 1.8; }
+    .low-results-text strong { color: var(--ink); font-weight: 700; }
+    .low-results-links { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+    .low-results-link {
+      font-family: 'Courier Prime', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink);
+      border: 1.5px solid var(--ink);
+      padding: 4px 12px;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .low-results-link:hover { background: var(--yellow); }
+
+    .subtopic-num {
+      font-weight: 700;
+      color: var(--ink);
+      flex-shrink: 0;
+      background: var(--yellow);
+      padding: 1px 6px;
+      font-size: 10px;
+    }
+
     /* ── PAPER CARD ── */
     .paper-card {
       display: block;
@@ -517,6 +585,12 @@
     .src-semantic { color: var(--stamp-blue);   border-color: var(--stamp-blue); }
     .src-pubmed   { color: var(--stamp-green);  border-color: var(--stamp-green); }
     .src-crossref { color: var(--stamp-purple); border-color: var(--stamp-purple); }
+    .src-ajol       { color: #1a6b3a;              border-color: #1a6b3a; }
+    .src-core       { color: #6b3a9a;              border-color: #6b3a9a; }
+    .src-doaj       { color: #9a3a1a;              border-color: #9a3a1a; }
+    .src-base       { color: #1a6b6b;              border-color: #1a6b6b; }
+    .src-eric       { color: #9a6b1a;              border-color: #9a6b1a; }
+    .src-epmc       { color: #3a6b1a;              border-color: #3a6b1a; }
 
     .paper-abstract {
       font-size: 13px;
@@ -583,6 +657,33 @@
       background: var(--yellow);
       box-shadow: 6px 6px 0 var(--ink);
       transform: translate(-1px, -1px);
+    }
+
+    .low-results-notice {
+      background: white;
+      border: 2px solid var(--ink);
+      border-left: 6px solid var(--yellow);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      box-shadow: 3px 3px 0 var(--ink);
+      font-family: 'Courier Prime', monospace;
+      font-size: 12px;
+      color: var(--ink-mid);
+      line-height: 1.8;
+    }
+    .low-results-notice strong {
+      display: block;
+      font-size: 13px;
+      color: var(--ink);
+      margin-bottom: 6px;
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 16px;
+      letter-spacing: -0.01em;
+    }
+    .low-results-notice a {
+      color: var(--ink);
+      font-weight: 700;
+      text-decoration: underline;
     }
 
     .load-more-count {
@@ -819,6 +920,12 @@
     <span class="nav-stamp">Semantic Scholar</span>
     <span class="nav-stamp">PubMed</span>
     <span class="nav-stamp">CrossRef</span>
+    <span class="nav-stamp">AJOL</span>
+    <span class="nav-stamp">CORE</span>
+    <span class="nav-stamp">DOAJ</span>
+    <span class="nav-stamp">Google Scholar</span>
+    <span class="nav-stamp">ERIC</span>
+    <span class="nav-stamp">Europe PMC</span>
   </div>
 </nav>
 
@@ -919,7 +1026,12 @@ document.getElementById('search-input').addEventListener('keydown', e => {
 });
 
 function srcClass(s) {
-  return { 'arXiv':'src-arxiv','Semantic Scholar':'src-semantic','PubMed':'src-pubmed','CrossRef':'src-crossref' }[s] || 'src-arxiv';
+  const map = {
+    'arXiv':'src-arxiv','Semantic Scholar':'src-semantic','PubMed':'src-pubmed',
+    'CrossRef':'src-crossref','AJOL':'src-ajol','CORE':'src-core',
+    'DOAJ':'src-doaj','BASE':'src-base','Google Scholar':'src-base','ERIC':'src-eric','Europe PMC':'src-epmc'
+  };
+  return map[s] || 'src-arxiv';
 }
 
 function scoreClass(s) { return s >= 8 ? 'high' : s >= 5 ? 'mid' : 'low'; }
@@ -949,8 +1061,16 @@ async function doSearch() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic }),
     });
-    if (!res.ok) throw new Error();
     const data = await res.json();
+    if (res.status === 429) {
+      loading.classList.remove('active');
+      document.getElementById('error-title').textContent = 'Daily limit reached.';
+      document.getElementById('error-sub').textContent = 'The AI ranking service has hit its daily token limit. Try again in a few minutes or tomorrow.';
+      err.classList.add('active');
+      btn.disabled = false;
+      return;
+    }
+    if (!res.ok) throw new Error(data.error || 'Unknown error');
     loading.classList.remove('active');
 
     if (!data.results || !data.results.length) {
@@ -962,11 +1082,49 @@ async function doSearch() {
 
     document.getElementById('results-num').textContent = data.results.length;
     document.getElementById('results-query').textContent = '"' + topic + '"';
+
+    // Show sub-topics banner if topic was decomposed
+    const oldBanner = document.getElementById('subtopics-banner');
+    if (oldBanner) oldBanner.remove();
+    if (data.sub_topics && data.sub_topics.length > 1) {
+      const banner = document.createElement('div');
+      banner.id = 'subtopics-banner';
+      banner.className = 'subtopics-banner';
+      banner.innerHTML = '<div class="subtopics-label">→ Complex topic detected — searched as:</div>' +
+        '<div class="subtopics-list">' +
+        data.sub_topics.map((s, i) =>
+          '<div class="subtopic-item"><span class="subtopic-num">' + (i+1) + '</span><span>' + s + '</span></div>'
+        ).join('') +
+        '</div>';
+      document.getElementById('results').before(banner);
+    }
+
     allPapers = data.results;
     shownCount = 0;
     const lm = document.getElementById('load-more-wrap');
     if (lm) lm.remove();
     renderBatch();
+    // Show low results warning for niche topics
+    const oldLowBanner = document.getElementById('low-results-banner');
+    if (oldLowBanner) oldLowBanner.remove();
+    if (data.results.length < 8) {
+      const lowBanner = document.createElement('div');
+      lowBanner.id = 'low-results-banner';
+      lowBanner.className = 'low-results-banner';
+      lowBanner.innerHTML = `
+        <div class="low-results-icon">📋</div>
+        <div class="low-results-text">
+          <strong>Only ${data.results.length} papers found.</strong> This is a niche topic and the open academic databases have limited coverage for it.
+          The papers above are the best available from Lumina's 8 sources — but more may exist in paywalled or specialised databases.
+          <div class="low-results-links">
+            <a class="low-results-link" href="https://scholar.google.com/scholar?q=${encodeURIComponent(topic)}" target="_blank">Search Google Scholar →</a>
+            <a class="low-results-link" href="https://www.jstor.org/action/doBasicSearch?Query=${encodeURIComponent(topic)}" target="_blank">Search JSTOR →</a>
+            <a class="low-results-link" href="https://www.researchgate.net/search?q=${encodeURIComponent(topic)}" target="_blank">Search ResearchGate →</a>
+          </div>
+        </div>`;
+      document.getElementById('results').before(lowBanner);
+    }
+
     section.style.display = 'block';
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch {
