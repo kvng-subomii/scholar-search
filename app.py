@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import os
 import json
 import re
@@ -7,11 +9,32 @@ import requests
 import xml.etree.ElementTree as ET
 from dotenv import load_dotenv
 from groq import Groq
+import logging
 
 load_dotenv()
 
+# ── STARTUP VALIDATION ─────────────────────────────────
+if not os.getenv("GROQ_API_KEY"):
+    raise ValueError("GROQ_API_KEY is not set. Check your .env file.")
+
 app = Flask(__name__, static_folder='.')
 CORS(app)
+
+# ── RATE LIMITING ──────────────────────────────────────
+# Max 10 searches per IP per hour, 3 per minute
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri="memory://",
+)
+
+# ── LOGGING ────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
@@ -59,53 +82,92 @@ Output:"""
         return " ".join(words[:7])
 
 
-# ── TOPIC DECOMPOSITION ────────────────────────────────
-def decompose_topic(topic: str) -> list:
+# ── SEARCH STRATEGY GENERATION ────────────────────────
+def generate_search_strategy(topic: str) -> dict:
     """
-    Detect compound/complex topics and split into focused sub-topics.
-    Returns [original] for simple topics, [sub1, sub2...] for compound ones.
+    Generate a comprehensive multi-angle search strategy from one topic.
+    Produces up to 6 targeted queries covering all angles a student needs
+    for a thorough literature review:
+      1. Exact topic
+      2. Thematic angle (themes in other works)
+      3. Work/author specific queries
+      4. Cited-by / written-about queries
+    Returns a dict with:
+      - queries: list of {label, query, keywords} objects
+      - sub_topics: list of display strings for the UI banner
     """
-    prompt = f"""You are an expert academic research assistant.
+    prompt = f"""You are an expert academic research librarian helping a student build a comprehensive literature review.
 
-Analyse this research topic and determine if it is COMPOUND (covers multiple distinct subjects, texts, or works joined together).
+Given this research topic, generate a multi-angle search strategy with up to 6 targeted search queries.
+Each query must serve a DIFFERENT purpose so the student gets broad, comprehensive coverage.
 
 Research topic: "{topic}"
 
+Generate queries for ALL applicable angles:
+1. EXACT TOPIC — search for the topic exactly as stated
+2. THEMATIC — search for the core themes/concepts in other literary texts or contexts (not just this specific work)
+3. WORK SPECIFIC — one query per named literary work, author, or text mentioned (if any)
+4. AUTHOR SCHOLARSHIP — search for academic papers written BY or ABOUT the named authors
+5. COMPARATIVE — search for papers comparing or contextualising the themes across similar works
+6. BROADER FIELD — search for foundational theory papers on the core concept (e.g. postcolonial theory, religious extremism in literature)
+
 RULES:
-1. SIMPLE topic (one subject/concept) → return original as single item
-2. COMPOUND topic (multiple texts, authors, or distinct works joined by "and") → split into focused sub-topics, keeping the thematic angle in each
-3. Maximum 4 sub-topics
-4. Each sub-topic must be a complete searchable query
+- Each query must be meaningfully different — no near-duplicates
+- Keep queries concise and searchable (under 10 words each)
+- For literary topics, always include at least one work-specific and one thematic query
+- For social science topics, include methodology and theory queries
+- Maximum 6 queries total
 
-Return ONLY a valid JSON array of strings. No explanation. No markdown.
+Return ONLY a valid JSON array. Each item must have:
+- "label": short name for this search angle (e.g. "Exact topic", "Radical faith in literature", "Obinna Udenwe's Satan and Shaitans")
+- "query": the full search string to use
+- "keywords": 4-6 key terms extracted from the query
 
-Examples:
-"climate change effects on agriculture" → ["climate change effects on agriculture"]
-"corruption in Chinua Achebe's Things Fall Apart and Wole Soyinka's Death and the King's Horseman" → ["corruption in Chinua Achebe's Things Fall Apart", "corruption in Wole Soyinka's Death and the King's Horseman"]
-"Social Media Advertising and Ad Avoidance Behaviour among Nigerian University Undergraduate Students" → ["Social Media Advertising and Ad Avoidance Behaviour among Nigerian University Undergraduate Students"]
+Example for "radical faith and manipulation in Obinna Udenwe's Satan and Shaitans and Elnathan John's Born on a Tuesday":
+[
+  {{"label": "Exact topic", "query": "radical faith political manipulation Nigerian fiction Udenwe Elnathan John", "keywords": "radical faith manipulation Nigerian fiction Udenwe Elnathan"}},
+  {{"label": "Radical faith in African literature", "query": "radical faith religious extremism African literature fiction", "keywords": "radical faith religious extremism African literature"}},
+  {{"label": "Obinna Udenwe Satan and Shaitans", "query": "Obinna Udenwe Satan Shaitans novel", "keywords": "Obinna Udenwe Satan Shaitans"}},
+  {{"label": "Elnathan John Born on a Tuesday", "query": "Elnathan John Born on a Tuesday novel", "keywords": "Elnathan John Born Tuesday novel"}},
+  {{"label": "Political manipulation Nigerian novels", "query": "political manipulation religion Nigerian contemporary fiction", "keywords": "political manipulation religion Nigerian fiction"}},
+  {{"label": "Postcolonial religion African fiction theory", "query": "postcolonial theory religion extremism African novel", "keywords": "postcolonial religion extremism African novel"}}
+]
 
-Now analyse: "{topic}"
+Now generate the search strategy for: "{topic}"
+Return ONLY the JSON array. No explanation. No markdown. No backticks.
 """
     try:
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
-            max_tokens=300,
+            max_tokens=800,
         )
         raw = response.choices[0].message.content.strip()
-        raw = re.sub(r'^```[a-z]*\n?', '', raw)
-        raw = re.sub(r'\n?```$', '', raw)
-        match = re.search(r'\[.*?\]', raw, re.DOTALL)
+        raw = re.sub(r'```[a-z]*', '', raw)
+        raw = re.sub(r'```', '', raw)
+        raw = raw.strip()
+        match = re.search(r'\[.*\]', raw, re.DOTALL)
         if match:
             raw = match.group(0)
-        sub_topics = json.loads(raw)
-        if isinstance(sub_topics, list) and all(isinstance(s, str) for s in sub_topics) and sub_topics:
-            print(f"Decomposed into {len(sub_topics)} sub-topics: {sub_topics}")
-            return sub_topics
+        strategy = json.loads(raw)
+        if isinstance(strategy, list) and strategy:
+            print(f"Search strategy: {len(strategy)} angles")
+            for s in strategy:
+                print(f"  [{s.get('label')}] → {s.get('query')}")
+            return {
+                "queries": strategy,
+                "sub_topics": [s["label"] for s in strategy]
+            }
     except Exception as e:
-        print(f"Topic decomposition error: {e}")
-    return [topic]
+        print(f"Strategy generation error: {e}")
+
+    # Fallback — single query with extracted keywords
+    kw = extract_keywords(topic)
+    return {
+        "queries": [{"label": "Search", "query": topic, "keywords": kw}],
+        "sub_topics": []
+    }
 
 
 # ── ARXIV ──────────────────────────────────────────────
@@ -432,41 +494,49 @@ def index():
 
 
 @app.route('/search', methods=['POST'])
+@limiter.limit("30 per hour")
+@limiter.limit("5 per minute")
 def search():
     data = request.get_json()
-    topic = data.get('topic', '').strip()
+    topic = data.get('topic', '').strip()[:500]  # Cap at 500 chars — prevents token abuse
     if not topic:
         return jsonify({'error': 'No topic provided'}), 400
 
     try:
-        # Step 1 — Extract keywords and decompose topic simultaneously
-        keywords = extract_keywords(topic)
-        sub_topics = decompose_topic(topic)
+        # Step 1 — Generate comprehensive multi-angle search strategy
+        strategy = generate_search_strategy(topic)
+        queries = strategy["queries"]
+        sub_topics = strategy["sub_topics"]
 
-        # Step 2 — For each sub-topic, extract its own keywords and search all sources
+        # Step 2 — Search all 8 sources for every angle in the strategy
         all_papers = []
         seen_titles = set()
 
-        for sub in sub_topics:
-            sub_kw = extract_keywords(sub) if len(sub_topics) > 1 else keywords
-            sub_papers = []
-            sub_papers += search_arxiv(sub, sub_kw, max_results=10)
-            sub_papers += search_semantic_scholar(sub, sub_kw, max_results=10)
-            sub_papers += search_pubmed(sub, sub_kw, max_results=10)
-            sub_papers += search_crossref(sub, sub_kw, max_results=10)
-            # OpenAlex general (AJOL)
-            sub_papers += search_openalex(sub, sub_kw, label="AJOL", max_results=10)
-            # OpenAlex social sciences filter
-            sub_papers += search_openalex(sub, sub_kw,
-                domain_filter="primary_topic.domain.id:https://openalex.org/domains/2|https://openalex.org/domains/4",
-                label="ERIC", max_results=10)
-            sub_papers += search_core(sub, sub_kw, max_results=10)
-            sub_papers += search_doaj(sub, sub_kw, max_results=10)
-            for p in sub_papers:
-                p["sub_topic"] = sub
-            all_papers += sub_papers
+        for angle in queries:
+            q = angle.get("query", topic)
+            kw = angle.get("keywords", extract_keywords(q))
+            label = angle.get("label", "Search")
+            print(f"\nSearching angle: [{label}]")
 
-        # Step 3 — Deduplicate by title
+            angle_papers = []
+            angle_papers += search_arxiv(q, kw, max_results=8)
+            angle_papers += search_semantic_scholar(q, kw, max_results=8)
+            angle_papers += search_pubmed(q, kw, max_results=8)
+            angle_papers += search_crossref(q, kw, max_results=8)
+            angle_papers += search_openalex(q, kw, label="AJOL", max_results=8)
+            angle_papers += search_openalex(q, kw,
+                domain_filter="primary_topic.domain.id:https://openalex.org/domains/2|https://openalex.org/domains/4",
+                label="ERIC", max_results=8)
+            angle_papers += search_core(q, kw, max_results=8)
+            angle_papers += search_doaj(q, kw, max_results=8)
+
+            # Tag each paper with its search angle for transparency
+            for p in angle_papers:
+                p["search_angle"] = label
+
+            all_papers += angle_papers
+
+        # Step 3 — Deduplicate by normalised title
         unique_papers = []
         for p in all_papers:
             key = p["title"].lower().strip()
@@ -476,18 +546,32 @@ def search():
 
         # Step 4 — Remove papers with no title or abstract
         unique_papers = [p for p in unique_papers if p.get("title") and p.get("abstract")]
-        print(f"Total unique papers with abstracts: {len(unique_papers)}")
+        print(f"\nTotal unique papers with abstracts: {len(unique_papers)}")
 
-        # Step 5 — Rank against original full topic
+        # Step 5 — Rank all papers against the original full topic
         ranked = rank_papers_with_ai(topic, unique_papers)
-        return jsonify({'results': ranked, 'sub_topics': sub_topics if len(sub_topics) > 1 else []})
+        return jsonify({
+            'results': ranked,
+            'sub_topics': sub_topics,
+            'angles_searched': len(queries)
+        })
 
     except Exception as e:
         err_str = str(e)
-        print(f"Search error: {err_str}")
+        logger.error(f"Search error: {err_str}")  # Full error logged server-side only
         if '429' in err_str or 'rate_limit' in err_str or 'Rate limit' in err_str:
             return jsonify({'error': 'rate_limit', 'message': 'Groq daily token limit reached. Please try again in a few minutes.'}), 429
-        return jsonify({'error': err_str}), 500
+        # Never expose internal errors to the client
+        return jsonify({'error': 'An internal error occurred. Please try again.'}), 500
+
+
+# ── RATE LIMIT ERROR HANDLER ──────────────────────────
+@app.errorhandler(429)
+def rate_limit_exceeded(e):
+    return jsonify({
+        'error': 'rate_limit',
+        'message': 'Too many searches. You are limited to 5 per minute and 30 per hour. Please wait a moment and try again.'
+    }), 429
 
 
 if __name__ == '__main__':

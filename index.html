@@ -295,30 +295,191 @@
 
     .loading.active { display: flex; }
 
-    .typewriter-line {
+    /* ── LOADING GAME ── */
+    .loading-wrap {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 0 48px;
+    }
+
+    .loading-status {
       font-family: 'Courier Prime', monospace;
-      font-size: 16px;
-      color: var(--ink-mid);
-      letter-spacing: 0.08em;
-    }
-
-    .cursor-blink {
-      display: inline-block;
-      width: 10px;
-      height: 18px;
-      background: var(--ink);
-      margin-left: 2px;
-      vertical-align: middle;
-      animation: blink 0.8s step-end infinite;
-    }
-
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-
-    .loading-sub {
-      font-size: 11px;
-      letter-spacing: 0.15em;
+      font-size: 12px;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
       color: var(--ink-faint);
+      margin-bottom: 10px;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(26,16,8,0.08);
+      border: 1.5px solid var(--ink);
+      margin-bottom: 6px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--ink);
+      width: 0%;
+      transition: width 0.8s ease;
+    }
+
+    .progress-label {
+      font-family: 'Courier Prime', monospace;
+      font-size: 10px;
+      color: var(--ink-faint);
+      letter-spacing: 0.1em;
+      margin-bottom: 32px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .game-card {
+      background: white;
+      border: 3px solid var(--ink);
+      box-shadow: 5px 5px 0 var(--ink);
+      padding: 28px 32px;
+      margin-bottom: 16px;
+      animation: cardDrop 0.4s ease both;
+    }
+
+    .game-label {
+      font-family: 'Courier Prime', monospace;
+      font-size: 9px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .game-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--ink-faint);
+      opacity: 0.3;
+    }
+
+    .game-question {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.3;
+      margin-bottom: 20px;
+      letter-spacing: -0.01em;
+    }
+
+    .game-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .game-option {
+      background: transparent;
+      border: 2px solid var(--ink);
+      padding: 12px 16px;
+      font-family: 'Courier Prime', monospace;
+      font-size: 13px;
+      color: var(--ink);
+      cursor: pointer;
+      text-align: left;
+      line-height: 1.5;
+      transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+    }
+
+    .game-option:hover:not(:disabled) {
+      background: var(--paper2);
+      box-shadow: 3px 3px 0 var(--ink);
+      transform: translate(-1px, -1px);
+    }
+
+    .game-option.correct {
+      background: var(--yellow);
+      border-color: var(--ink);
+      box-shadow: 3px 3px 0 var(--ink);
+    }
+
+    .game-option.wrong {
+      background: #ffeded;
+      border-color: var(--ink);
+      opacity: 0.6;
+    }
+
+    .game-option:disabled { cursor: not-allowed; }
+
+    .game-feedback {
+      font-family: 'Courier Prime', monospace;
+      font-size: 13px;
+      color: var(--ink-mid);
+      font-style: italic;
+      line-height: 1.7;
+      min-height: 40px;
+      padding: 10px 14px;
+      border-left: 3px solid var(--yellow);
+      display: none;
+    }
+
+    .game-score-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 14px;
+    }
+
+    .game-score {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: -0.01em;
+    }
+
+    .game-next {
+      background: transparent;
+      border: 2px solid var(--ink);
+      padding: 8px 20px;
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink);
+      cursor: pointer;
+      box-shadow: 2px 2px 0 var(--ink);
+      transition: box-shadow 0.15s, transform 0.15s, background 0.15s;
+      display: none;
+    }
+
+    .game-next:hover {
+      background: var(--yellow);
+      box-shadow: 4px 4px 0 var(--ink);
+      transform: translate(-1px, -1px);
+    }
+
+    .game-fact {
+      background: var(--paper2);
+      border: 1.5px dashed var(--ink-faint);
+      padding: 14px 18px;
+      font-family: 'Courier Prime', monospace;
+      font-size: 12px;
+      color: var(--ink-mid);
+      line-height: 1.8;
+      font-style: italic;
+    }
+
+    .game-fact strong {
+      font-style: normal;
+      color: var(--ink);
     }
 
     /* ═══ RESULTS SECTION ═══ */
@@ -972,8 +1133,32 @@
 
 <!-- LOADING -->
 <div class="loading" id="loading">
-  <div class="typewriter-line">Searching databases<span class="cursor-blink"></span></div>
-  <div class="loading-sub">15–25 seconds · reading every abstract</div>
+  <div class="loading-wrap">
+
+    <!-- Progress bar -->
+    <div class="loading-status" id="loading-status">Preparing search strategy…</div>
+    <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="progress-label">
+      <span id="progress-angle"></span>
+      <span id="progress-pct">0%</span>
+    </div>
+
+    <!-- Trivia game -->
+    <div class="game-card" id="game-card">
+      <div class="game-label">While you wait — academic trivia</div>
+      <div class="game-question" id="game-question"></div>
+      <div class="game-options" id="game-options"></div>
+      <div class="game-feedback" id="game-feedback"></div>
+      <div class="game-score-row">
+        <div class="game-score">Score: <span id="game-score">0</span> / <span id="game-total">0</span></div>
+        <button class="game-next" id="game-next" onclick="nextQuestion()">Next →</button>
+      </div>
+    </div>
+
+    <!-- Rotating facts -->
+    <div class="game-fact" id="game-fact"></div>
+
+  </div>
 </div>
 
 <!-- ERROR -->
@@ -1054,6 +1239,10 @@ async function doSearch() {
   el.innerHTML = '';
   err.classList.remove('active');
   loading.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  startTrivia();
+  startProgress();
+  startDots();
+  startGame();
 
   try {
     const res = await fetch('/search', {
@@ -1064,14 +1253,19 @@ async function doSearch() {
     const data = await res.json();
     if (res.status === 429) {
       loading.classList.remove('active');
-      document.getElementById('error-title').textContent = 'Daily limit reached.';
-      document.getElementById('error-sub').textContent = 'The AI ranking service has hit its daily token limit. Try again in a few minutes or tomorrow.';
+      const msg = data.message || '';
+      const isTooFast = msg.toLowerCase().includes('minute');
+      document.getElementById('error-title').textContent = isTooFast ? 'Slow down a little.' : 'Daily limit reached.';
+      document.getElementById('error-sub').textContent = isTooFast
+        ? 'Maximum 3 searches per minute. Wait a moment and try again.'
+        : 'The AI ranking service has hit its daily token limit. Try again in a few minutes or tomorrow.';
       err.classList.add('active');
       btn.disabled = false;
       return;
     }
     if (!res.ok) throw new Error(data.error || 'Unknown error');
     loading.classList.remove('active');
+    stopGame();
 
     if (!data.results || !data.results.length) {
       document.getElementById('error-title').textContent = 'Nothing found.';
@@ -1083,14 +1277,15 @@ async function doSearch() {
     document.getElementById('results-num').textContent = data.results.length;
     document.getElementById('results-query').textContent = '"' + topic + '"';
 
-    // Show sub-topics banner if topic was decomposed
+    // Show search angles banner
     const oldBanner = document.getElementById('subtopics-banner');
     if (oldBanner) oldBanner.remove();
-    if (data.sub_topics && data.sub_topics.length > 1) {
+    if (data.sub_topics && data.sub_topics.length > 0) {
       const banner = document.createElement('div');
       banner.id = 'subtopics-banner';
       banner.className = 'subtopics-banner';
-      banner.innerHTML = '<div class="subtopics-label">→ Complex topic detected — searched as:</div>' +
+      banner.innerHTML =
+        '<div class="subtopics-label">→ ' + (data.angles_searched || data.sub_topics.length) + ' search angles used across 8 databases</div>' +
         '<div class="subtopics-list">' +
         data.sub_topics.map((s, i) =>
           '<div class="subtopic-item"><span class="subtopic-num">' + (i+1) + '</span><span>' + s + '</span></div>'
@@ -1129,6 +1324,7 @@ async function doSearch() {
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch {
     loading.classList.remove('active');
+    stopGame();
     err.classList.add('active');
   } finally {
     btn.disabled = false;
@@ -1253,8 +1449,359 @@ function showCareer(i) {
   }, 350);
 }
 
+
+/* ═══════════════════════════════
+   TRIVIA GAME
+═══════════════════════════════ */
+const triviaBank = [
+  { q: "Who is credited with developing the World Wide Web in 1989?", a: "Tim Berners-Lee", opts: ["Tim Berners-Lee", "Bill Gates", "Linus Torvalds", "Dennis Ritchie"], fact: "Berners-Lee invented the Web while working at CERN and made it freely available to the world." },
+  { q: "What year did Charles Darwin publish 'On the Origin of Species'?", a: "1859", opts: ["1859", "1871", "1842", "1905"], fact: "Darwin delayed publishing for 20 years, fearing public reaction to his theory of natural selection." },
+  { q: "Which scientist developed the theory of general relativity?", a: "Albert Einstein", opts: ["Albert Einstein", "Isaac Newton", "Niels Bohr", "Max Planck"], fact: "Einstein published his general theory of relativity in 1915, revolutionising our understanding of gravity." },
+  { q: "What does DNA stand for?", a: "Deoxyribonucleic Acid", opts: ["Deoxyribonucleic Acid", "Dynamic Nucleic Agent", "Dual Nitrogen Array", "Dense Nucleotide Assembly"], fact: "The double helix structure of DNA was discovered by Watson, Crick, Franklin and Wilkins in 1953." },
+  { q: "Which African country produced Nobel Peace Prize winner Wole Soyinka?", a: "Nigeria", opts: ["Nigeria", "Ghana", "Kenya", "South Africa"], fact: "Wole Soyinka won the Nobel Prize in Literature in 1986, becoming the first African to do so." },
+  { q: "What is the process by which plants make food using sunlight?", a: "Photosynthesis", opts: ["Photosynthesis", "Respiration", "Osmosis", "Fermentation"], fact: "Photosynthesis converts CO₂ and water into glucose and oxygen using light energy from the sun." },
+  { q: "Which university is the oldest in Africa?", a: "University of al-Qarawiyyin", opts: ["University of al-Qarawiyyin", "University of Cairo", "University of Ghana", "University of Cape Town"], fact: "Founded in Fez, Morocco in 859 AD, it is recognised as the world's oldest continuously operating university." },
+  { q: "What year was the internet's predecessor, ARPANET, created?", a: "1969", opts: ["1969", "1975", "1983", "1991"], fact: "ARPANET sent its first message on October 29, 1969 — the system crashed after just two letters." },
+  { q: "Who wrote 'Things Fall Apart', a landmark of African literature?", a: "Chinua Achebe", opts: ["Chinua Achebe", "Ngugi wa Thiong'o", "Chimamanda Adichie", "Ben Okri"], fact: "Published in 1958, Things Fall Apart has been translated into over 57 languages and sold 20 million copies." },
+  { q: "What is the powerhouse of the cell?", a: "Mitochondria", opts: ["Mitochondria", "Nucleus", "Ribosome", "Golgi apparatus"], fact: "Mitochondria produce ATP through cellular respiration and have their own DNA, suggesting they were once independent organisms." },
+  { q: "Which scientist discovered penicillin?", a: "Alexander Fleming", opts: ["Alexander Fleming", "Louis Pasteur", "Joseph Lister", "Marie Curie"], fact: "Fleming discovered penicillin in 1928 when he noticed mould killing bacteria on a petri dish he had left out." },
+  { q: "What does 'peer review' mean in academic publishing?", a: "Experts evaluate research before publication", opts: ["Experts evaluate research before publication", "Students review each other's essays", "A journal charges authors fees", "Papers are published immediately"], fact: "Peer review is the gold standard for academic quality control, though debates about its limitations are ongoing." },
+  { q: "How many bones are in the adult human body?", a: "206", opts: ["206", "212", "198", "226"], fact: "Babies are born with around 270–300 bones, many of which fuse together as they grow into adulthood." },
+  { q: "Which Nigerian author wrote 'Purple Hibiscus'?", a: "Chimamanda Ngozi Adichie", opts: ["Chimamanda Ngozi Adichie", "Teju Cole", "Ben Okri", "Helon Habila"], fact: "Adichie's debut novel was published in 2003 when she was just 26 and won the Commonwealth Writers' Prize." },
+  { q: "What is the most cited academic paper of all time?", a: "A paper on protein measurement by Bradford (1976)", opts: ["A paper on protein measurement by Bradford (1976)", "Einstein's 1905 relativity paper", "Watson and Crick's DNA paper", "Newton's Principia Mathematica"], fact: "Bradford's 1976 method for measuring protein concentration has been cited over 300,000 times in scientific literature." },
+  { q: "In what year was the first academic journal published?", a: "1665", opts: ["1665", "1750", "1820", "1900"], fact: "Philosophical Transactions of the Royal Society, founded in 1665, is still published today — making it the world's longest-running scientific journal." },
+  { q: "What is 'open access' publishing?", a: "Research freely available to everyone online", opts: ["Research freely available to everyone online", "Publishing without peer review", "Journals with no submission fees", "Research shared only with universities"], fact: "The open access movement aims to make publicly-funded research freely available — a direct inspiration for tools like Lumina." },
+  { q: "Which country has the most Nobel Prize winners?", a: "United States", opts: ["United States", "United Kingdom", "Germany", "Sweden"], fact: "The US has won over 400 Nobel Prizes. Many winners were immigrants who built their careers in America." },
+  { q: "What does JSTOR stand for?", a: "Journal Storage", opts: ["Journal Storage", "Joint Scientific Terminology Online Repository", "Journal of Science and Technology Online Resource", "Just Storage"], fact: "JSTOR was founded in 1994 to digitise back issues of academic journals and make them searchable online." },
+  { q: "What is a literature review in academic research?", a: "A survey of existing research on a topic", opts: ["A survey of existing research on a topic", "A review of books you enjoyed", "A summary of one key paper", "An introduction to your methodology"], fact: "A good literature review shows gaps in existing knowledge — the gap your own research will fill." },
+  { q: "What does 'plagiarism' mean in academic writing?", a: "Using others' work without proper credit", opts: ["Using others' work without proper credit", "Writing too much about one topic", "Copying your own previous work", "Citing too many sources"], fact: "Academic integrity matters: always cite your sources. That's exactly what Lumina helps you find." },
+  { q: "Who developed the polio vaccine?", a: "Jonas Salk", opts: ["Jonas Salk", "Louis Pasteur", "Edward Jenner", "Alexander Fleming"], fact: "Salk announced his vaccine in 1955. He refused to patent it, saying it belonged to the people." },
+  { q: "What is the h-index used to measure?", a: "A researcher's productivity and citation impact", opts: ["A researcher's productivity and citation impact", "The length of a research paper", "Journal ranking worldwide", "Number of databases a paper appears in"], fact: "Proposed by physicist Jorge Hirsch in 2005, the h-index helps evaluate a researcher's overall academic influence." },
+  { q: "Which programming language was created by Guido van Rossum?", a: "Python", opts: ["Python", "Java", "C++", "Ruby"], fact: "Van Rossum named Python after Monty Python's Flying Circus, not the snake. He released it in 1991." },
+  { q: "What year was Google Scholar launched?", a: "2004", opts: ["2004", "1998", "2001", "2007"], fact: "Google Scholar launched in beta in November 2004, quickly becoming the most widely used academic search tool — until Lumina came along." },
+
+  { q: "What is a DOI in academic publishing?", a: "A permanent digital identifier for a paper", opts: ["A permanent digital identifier for a paper", "A database of open access journals", "A type of research methodology", "A citation format style"], fact: "DOI stands for Digital Object Identifier. It gives every paper a permanent link that never breaks, unlike normal URLs." },
+  { q: "Which element has the chemical symbol 'Au'?", a: "Gold", opts: ["Gold", "Silver", "Aluminium", "Argon"], fact: "Au comes from the Latin word 'aurum'. Gold has been used as currency and jewellery for over 6,000 years." },
+  { q: "What does 'APA' stand for in referencing?", a: "American Psychological Association", opts: ["American Psychological Association", "Academic Publishing Authority", "Association of Professional Authors", "Applied Psychology Academy"], fact: "APA referencing style is widely used in social sciences, psychology, and education research worldwide." },
+  { q: "Who was the first woman to win a Nobel Prize?", a: "Marie Curie", opts: ["Marie Curie", "Rosalind Franklin", "Dorothy Hodgkin", "Lise Meitner"], fact: "Marie Curie won the Nobel Prize in Physics in 1903 and Chemistry in 1908 — the only person to win in two different sciences." },
+  { q: "What is an 'abstract' in a research paper?", a: "A short summary of the paper's key findings", opts: ["A short summary of the paper's key findings", "The introduction section", "A list of references used", "The conclusion of the paper"], fact: "A well-written abstract is crucial — it's usually the only part people read before deciding whether to download the full paper." },
+  { q: "Which planet is known as the Red Planet?", a: "Mars", opts: ["Mars", "Venus", "Jupiter", "Saturn"], fact: "Mars appears red due to iron oxide (rust) on its surface. NASA's rovers have been exploring it since 1997." },
+  { q: "What is 'citation' in academic writing?", a: "Crediting the source of information used", opts: ["Crediting the source of information used", "Summarising a long paper briefly", "Quoting verbatim from a source", "Listing all books you have read"], fact: "Proper citation allows readers to trace ideas back to their origin and is the foundation of academic integrity." },
+  { q: "Who invented the telephone?", a: "Alexander Graham Bell", opts: ["Alexander Graham Bell", "Thomas Edison", "Nikola Tesla", "Guglielmo Marconi"], fact: "Bell patented the telephone in 1876, though Elisha Gray filed a similar patent just hours later — one of history's closest patent races." },
+  { q: "What is 'qualitative research'?", a: "Research using non-numerical data like interviews", opts: ["Research using non-numerical data like interviews", "Research based entirely on statistics", "Research conducted in laboratories only", "Research published in top journals"], fact: "Qualitative research captures human experience in depth. It's the dominant method in humanities, social work, and education studies." },
+  { q: "Which gas do plants absorb during photosynthesis?", a: "Carbon dioxide", opts: ["Carbon dioxide", "Oxygen", "Nitrogen", "Hydrogen"], fact: "Plants absorb CO₂ and release oxygen — the opposite of what animals do during respiration. Together they balance Earth's atmosphere." },
+  { q: "What does 'empirical' mean in research?", a: "Based on observation and evidence", opts: ["Based on observation and evidence", "Based on theoretical models only", "Based on expert opinion", "Based on historical records"], fact: "Empirical research is grounded in measurable, observable evidence — a cornerstone of the scientific method since Francis Bacon." },
+  { q: "In what country was the first printing press invented?", a: "Germany", opts: ["Germany", "China", "England", "Italy"], fact: "Johannes Gutenberg invented the movable-type printing press in Germany around 1440, transforming the spread of knowledge forever." },
+  { q: "What is 'quantitative research'?", a: "Research involving numerical data and statistics", opts: ["Research involving numerical data and statistics", "Research based on personal experience", "Research done in natural settings only", "Research without a hypothesis"], fact: "Quantitative methods allow researchers to measure patterns across large populations — essential in fields like economics and public health." },
+  { q: "Who wrote 'A Brief History of Time'?", a: "Stephen Hawking", opts: ["Stephen Hawking", "Carl Sagan", "Richard Feynman", "Neil deGrasse Tyson"], fact: "Hawking's 1988 book has sold over 25 million copies. He wrote it to explain black holes and the Big Bang to a general audience." },
+  { q: "What is the largest organ in the human body?", a: "Skin", opts: ["Skin", "Liver", "Brain", "Lungs"], fact: "The skin covers about 2 square metres and weighs around 4kg in an average adult. It is technically an organ." },
+  { q: "What does 'interdisciplinary' research mean?", a: "Research combining methods from multiple fields", opts: ["Research combining methods from multiple fields", "Research done by international teams", "Research across multiple universities", "Research funded by multiple bodies"], fact: "Some of the most impactful research — like behavioural economics or computational biology — sits at the intersection of two fields." },
+  { q: "Which African country has won the most Nobel Prizes?", a: "South Africa", opts: ["South Africa", "Nigeria", "Egypt", "Kenya"], fact: "South Africa has produced Nobel laureates including Nelson Mandela, Desmond Tutu, and Nadine Gordimer across peace, literature, and medicine." },
+  { q: "What is a 'hypothesis' in scientific research?", a: "A testable prediction about the outcome of a study", opts: ["A testable prediction about the outcome of a study", "The final conclusion of a study", "A summary of existing literature", "A statement of the research problem"], fact: "A good hypothesis is specific, measurable, and falsifiable — meaning evidence must be able to prove it wrong." },
+  { q: "Who developed the first smallpox vaccine?", a: "Edward Jenner", opts: ["Edward Jenner", "Louis Pasteur", "Robert Koch", "Joseph Lister"], fact: "Jenner noticed milkmaids who caught cowpox never got smallpox. In 1796 he tested his vaccine on a child — a practice that would be unethical today." },
+  { q: "What is 'academic integrity'?", a: "Honest and ethical conduct in research and writing", opts: ["Honest and ethical conduct in research and writing", "Publishing only in top-ranked journals", "Writing without any outside help", "Completing all assignments on time"], fact: "Academic integrity includes proper citation, original work, and honest reporting of research findings — the pillars of trustworthy scholarship." },
+  { q: "What is the speed of light in a vacuum?", a: "300,000 km/s", opts: ["300,000 km/s", "150,000 km/s", "450,000 km/s", "1,000,000 km/s"], fact: "Einstein showed that nothing with mass can travel at or beyond the speed of light — it is the universe's absolute speed limit." },
+  { q: "What does 'methodology' mean in a research paper?", a: "The methods used to collect and analyse data", opts: ["The methods used to collect and analyse data", "The background theory of a study", "The summary of all findings", "The list of databases searched"], fact: "A clear methodology section allows other researchers to replicate your study — replication is how science builds reliable knowledge." },
+  { q: "Who is considered the father of modern computing?", a: "Alan Turing", opts: ["Alan Turing", "John von Neumann", "Charles Babbage", "Ada Lovelace"], fact: "Turing's 1936 paper describing a theoretical computing machine laid the foundation for every computer ever built." },
+  { q: "What is 'impact factor' in academic publishing?", a: "A measure of how often a journal's papers are cited", opts: ["A measure of how often a journal's papers are cited", "The number of papers a journal publishes yearly", "The cost to publish in a journal", "The age of an academic journal"], fact: "High impact factor journals are seen as prestigious, but critics argue it incentivises sensational findings over replication studies." },
+  { q: "What percentage of the ocean has been explored by humans?", a: "Around 20%", opts: ["Around 20%", "Around 50%", "Around 80%", "Around 5%"], fact: "Despite covering 70% of Earth's surface, most of the ocean remains unmapped and unexplored — more is known about the surface of Mars." },
+];
+
+let triviaQueue = [];
+let triviaIndex = 0;
+let triviaScore = 0;
+let triviaAnswered = false;
+let triviaInterval = null;
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function startTrivia() {
+  triviaQueue = shuffleArray(triviaBank);
+  triviaIndex = 0;
+  triviaScore = 0;
+  document.getElementById('trivia-score').textContent = '0';
+  document.getElementById('trivia-total').textContent = triviaQueue.length;
+  showTrivia(0);
+}
+
+function showTrivia(idx) {
+  if (idx >= triviaQueue.length) {
+    document.getElementById('trivia-question').textContent = 'All questions answered! Great work.';
+    document.getElementById('trivia-options').innerHTML = '';
+    document.getElementById('trivia-feedback').textContent = 'Final score: ' + triviaScore + ' / ' + triviaQueue.length;
+    document.getElementById('trivia-next').style.display = 'none';
+    return;
+  }
+  triviaAnswered = false;
+  const q = triviaQueue[idx];
+  document.getElementById('trivia-qnum').textContent = idx + 1;
+  document.getElementById('trivia-question').textContent = q.q;
+  document.getElementById('trivia-feedback').textContent = '';
+  document.getElementById('trivia-next').style.display = 'none';
+
+  const opts = shuffleArray(q.opts);
+  const container = document.getElementById('trivia-options');
+  container.innerHTML = '';
+  opts.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'trivia-btn';
+    btn.textContent = opt;
+    btn.onclick = () => answerTrivia(opt, q.a, q.fact);
+    container.appendChild(btn);
+  });
+}
+
+function answerTrivia(selected, correct, fact) {
+  if (triviaAnswered) return;
+  triviaAnswered = true;
+  const btns = document.querySelectorAll('.trivia-btn');
+  btns.forEach(btn => {
+    btn.disabled = true;
+    if (btn.textContent === correct) btn.classList.add('correct');
+    else if (btn.textContent === selected) btn.classList.add('wrong');
+  });
+  const isCorrect = selected === correct;
+  if (isCorrect) {
+    triviaScore++;
+    document.getElementById('trivia-score').textContent = triviaScore;
+    document.getElementById('trivia-feedback').textContent = '✓ Correct! ' + fact;
+  } else {
+    document.getElementById('trivia-feedback').textContent = '✗ The answer was: ' + correct + '. ' + fact;
+  }
+  document.getElementById('trivia-next').style.display = 'inline-block';
+}
+
+function nextQuestion() {
+  triviaIndex++;
+  showTrivia(triviaIndex);
+}
+
+/* Progress bar stages */
+const stages = [
+  { id: 'ps1', label: 'Generating search strategy...', pct: 8 },
+  { id: 'ps2', label: 'Searching 8 databases across 6 angles...', pct: 55 },
+  { id: 'ps3', label: 'AI ranking papers by relevance...', pct: 88 },
+  { id: 'ps4', label: 'Done!', pct: 100 },
+];
+let progressTimer = null;
+let currentStage = 0;
+
+function startProgress() {
+  currentStage = 0;
+  setProgressStage(0);
+  // Animate through stages on realistic timings
+  const timings = [3000, 22000, 35000];
+  timings.forEach((delay, i) => {
+    setTimeout(() => {
+      if (document.getElementById('loading').classList.contains('active')) {
+        setProgressStage(i + 1);
+      }
+    }, delay);
+  });
+}
+
+function setProgressStage(idx) {
+  if (idx >= stages.length) return;
+  currentStage = idx;
+  const fill = document.getElementById('progress-fill');
+  const label = document.getElementById('progress-label');
+  fill.style.width = stages[idx].pct + '%';
+  label.textContent = stages[idx].label;
+  stages.forEach((s, i) => {
+    const el = document.getElementById(s.id);
+    if (!el) return;
+    el.className = 'progress-stage' + (i < idx ? ' done' : i === idx ? ' active' : '');
+  });
+}
+
+function stopProgress() {
+  setProgressStage(3);
+}
+
+/* Animate the dots in loading title */
+let dotsInterval = null;
+function startDots() {
+  let d = 0;
+  const el = document.getElementById('loading-dots');
+  if (!el) return;
+  dotsInterval = setInterval(() => {
+    d = (d + 1) % 4;
+    el.textContent = '.'.repeat(d) || '';
+  }, 400);
+}
+function stopDots() {
+  if (dotsInterval) clearInterval(dotsInterval);
+  const el = document.getElementById('loading-dots');
+  if (el) el.textContent = '';
+}
+
+
 initCareers();
 setInterval(() => showCareer((currentCareer + 1) % careers.length), 4000);
+
+/* ═══════════════════════════════
+   TRIVIA GAME + PROGRESS
+═══════════════════════════════ */
+const triviaQuestions = [
+  { q: "Who published the first peer-reviewed academic journal?", opts: ["Henry Oldenburg", "Isaac Newton", "René Descartes", "Galileo Galilei"], ans: 0, fact: "Henry Oldenburg founded the Philosophical Transactions of the Royal Society in 1665 — widely considered the world's first scientific journal." },
+  { q: "What does 'peer review' actually mean?", opts: ["Students grading each other", "Experts in the field evaluating a paper before publication", "A journal editor approving content", "Government scientists checking findings"], ans: 1, fact: "Peer review means other experts in the same field critically evaluate a paper for quality, accuracy, and significance before it gets published." },
+  { q: "What is a 'citation' in academic research?", opts: ["A legal fine for plagiarism", "A reference to another work that supports your argument", "A summary of your own paper", "An award for good research"], ans: 1, fact: "Citations give credit to previous researchers and show readers where your evidence comes from. A well-cited paper is harder to discredit." },
+  { q: "What is the 'abstract' of a research paper?", opts: ["The conclusion section", "A short summary of the whole paper", "The list of references", "The author's biography"], ans: 1, fact: "The abstract is usually 150–300 words summarising the research question, method, findings, and conclusion. It's the first thing Lumina reads to judge relevance." },
+  { q: "What does 'open access' mean for a journal?", opts: ["The journal is free for anyone to read", "You need a university login to read it", "The data is publicly available but the paper is not", "The authors pay to publish"], ans: 0, fact: "Open access means the paper is freely available online without a paywall. All 8 of Lumina's databases prioritise open access papers." },
+  { q: "What is a 'literature review'?", opts: ["A review of books by a famous author", "A critical survey of existing research on a topic", "A summary of your own findings", "A bibliography at the end of a paper"], ans: 1, fact: "A literature review shows what research already exists on your topic, identifies gaps, and positions your own work within the field. Lumina is built to help with exactly this." },
+  { q: "What does 'DOI' stand for?", opts: ["Database of Information", "Digital Object Identifier", "Document Origin Index", "Directory of Internet"], ans: 1, fact: "A DOI is a permanent link to a paper. Unlike URLs that change, a DOI always points to the same document — which is why Lumina uses DOIs for paper links." },
+  { q: "Which database indexes the most academic papers?", opts: ["PubMed", "arXiv", "Semantic Scholar", "CrossRef"], ans: 2, fact: "Semantic Scholar indexes over 200 million papers using AI to understand their meaning — not just keyword matching. It's one of Lumina's core sources." },
+  { q: "What is 'grey literature'?", opts: ["Papers written in grey ink", "Research published outside traditional academic journals", "Low quality or rejected papers", "Papers from the 1800s"], ans: 1, fact: "Grey literature includes theses, government reports, conference papers, and working papers. It often contains valuable research that never made it into a journal." },
+  { q: "What is 'plagiarism' in academic writing?", opts: ["Writing too slowly", "Using someone else's work without proper credit", "Citing too many sources", "Writing in a foreign language"], ans: 1, fact: "Plagiarism is presenting someone else's words or ideas as your own. Proper citation — the kind Lumina helps you find — is the solution." },
+  { q: "What year was the internet made publicly available?", opts: ["1983", "1989", "1991", "1995"], ans: 2, fact: "The World Wide Web was opened to the public in 1991. Before that, academic papers were shared almost exclusively by post and in physical journals." },
+  { q: "What does 'empirical research' mean?", opts: ["Research based on opinion", "Research based on observation and evidence", "Research done in a laboratory only", "Research that uses mathematics"], ans: 1, fact: "Empirical research draws conclusions from data collected through observation, experiments, or surveys — as opposed to purely theoretical work." },
+  { q: "What is a 'thesis statement'?", opts: ["The title of your paper", "The central argument your entire paper defends", "Your list of sources", "The first paragraph of your introduction"], ans: 1, fact: "A clear thesis statement is the backbone of any research paper. Every piece of evidence you find should connect back to defending it." },
+  { q: "What does arXiv specialise in?", opts: ["Medical research only", "STEM preprints — papers before peer review", "African academic journals", "Social science and humanities"], ans: 1, fact: "arXiv (pronounced 'archive') hosts preprints — papers shared publicly before formal peer review. It's huge in physics, mathematics, computer science, and AI." },
+  { q: "What is 'postcolonial theory' in literature?", opts: ["A theory about countries after war", "A framework for analysing the effects of colonialism on culture and literature", "A political party's ideology", "A theory about modern African governments"], ans: 1, fact: "Postcolonial theory examines how colonialism shaped identity, culture, language, and power. It's widely used to analyse African literature — including works by Chinua Achebe, Chimamanda Adichie, and many others." },
+];
+
+const facts = [
+  "The average research paper takes <strong>6–18 months</strong> to go from submission to publication.",
+  "Only about <strong>50% of submitted papers</strong> are accepted by academic journals after peer review.",
+  "The world's most cited paper has been referenced <strong>over 400,000 times</strong> — it's about a protein measurement method.",
+  "Nigeria has over <strong>170 universities</strong> producing tens of thousands of research papers every year.",
+  "The term <strong>'academic'</strong> comes from the Akademia — the garden in Athens where Plato taught philosophy.",
+  "Approximately <strong>2.5 million new papers</strong> are published globally every year across all academic disciplines.",
+  "<strong>AJOL (African Journals Online)</strong> hosts over 500 peer-reviewed African journals — one of the most underutilised academic resources in the world.",
+  "The first university in the world was the <strong>University of Bologna</strong>, founded in 1088 in Italy.",
+  "Africa's oldest university is <strong>Al-Azhar University</strong> in Cairo, founded in 970 AD.",
+  "A <strong>dissertation</strong> and a <strong>thesis</strong> are different things — a thesis presents existing knowledge in a new way; a dissertation presents original research.",
+];
+
+let currentQ = 0;
+let score = 0;
+let answered = 0;
+let shuffledQuestions = [];
+let progressInterval = null;
+let factInterval = null;
+let progressStep = 0;
+
+const progressSteps = [
+  { pct: 5,  label: "Generating search strategy…" },
+  { pct: 12, label: "Extracting keywords…" },
+  { pct: 18, label: "Searching arXiv…" },
+  { pct: 26, label: "Searching Semantic Scholar…" },
+  { pct: 33, label: "Searching PubMed + CrossRef…" },
+  { pct: 42, label: "Searching OpenAlex databases…" },
+  { pct: 52, label: "Searching CORE…" },
+  { pct: 60, label: "Searching DOAJ…" },
+  { pct: 68, label: "Deduplicating results…" },
+  { pct: 75, label: "Ranking relevance — batch 1…" },
+  { pct: 82, label: "Ranking relevance — batch 2…" },
+  { pct: 88, label: "Ranking relevance — batch 3…" },
+  { pct: 93, label: "Ranking relevance — batch 4…" },
+  { pct: 97, label: "Almost done — filtering results…" },
+];
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function startGame() {
+  shuffledQuestions = shuffleArray(triviaQuestions);
+  currentQ = 0;
+  score = 0;
+  answered = 0;
+  document.getElementById('game-score').textContent = '0';
+  document.getElementById('game-total').textContent = '0';
+  loadQuestion();
+  rotateFact();
+  startProgress();
+}
+
+function loadQuestion() {
+  if (currentQ >= shuffledQuestions.length) currentQ = 0;
+  const q = shuffledQuestions[currentQ];
+  document.getElementById('game-question').textContent = q.q;
+  document.getElementById('game-feedback').style.display = 'none';
+  document.getElementById('game-next').style.display = 'none';
+
+  const opts = document.getElementById('game-options');
+  opts.innerHTML = '';
+  q.opts.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'game-option';
+    btn.textContent = opt;
+    btn.onclick = () => answerQuestion(i, q.ans, q.fact);
+    opts.appendChild(btn);
+  });
+}
+
+function answerQuestion(chosen, correct, fact) {
+  const btns = document.querySelectorAll('.game-option');
+  btns.forEach(b => b.disabled = true);
+  btns[correct].classList.add('correct');
+  if (chosen !== correct) btns[chosen].classList.add('wrong');
+
+  answered++;
+  if (chosen === correct) score++;
+
+  document.getElementById('game-score').textContent = score;
+  document.getElementById('game-total').textContent = answered;
+
+  const fb = document.getElementById('game-feedback');
+  fb.textContent = fact;
+  fb.style.display = 'block';
+  document.getElementById('game-next').style.display = 'inline-block';
+}
+
+function nextQuestion() {
+  currentQ++;
+  loadQuestion();
+}
+
+function rotateFact() {
+  let fi = Math.floor(Math.random() * facts.length);
+  document.getElementById('game-fact').innerHTML = facts[fi];
+  factInterval = setInterval(() => {
+    fi = (fi + 1) % facts.length;
+    document.getElementById('game-fact').innerHTML = facts[fi];
+  }, 8000);
+}
+
+function startProgress() {
+  progressStep = 0;
+  setProgressStep(0);
+  progressInterval = setInterval(() => {
+    progressStep++;
+    if (progressStep < progressSteps.length) {
+      setProgressStep(progressStep);
+    }
+  }, 3200);
+}
+
+function setProgressStep(i) {
+  const step = progressSteps[Math.min(i, progressSteps.length - 1)];
+  document.getElementById('progress-fill').style.width = step.pct + '%';
+  document.getElementById('progress-pct').textContent = step.pct + '%';
+  document.getElementById('loading-status').textContent = step.label;
+  document.getElementById('progress-angle').textContent = '';
+}
+
+function stopGame() {
+  if (progressInterval) clearInterval(progressInterval);
+  if (factInterval) clearInterval(factInterval);
+  document.getElementById('progress-fill').style.width = '100%';
+  document.getElementById('progress-pct').textContent = '100%';
+  document.getElementById('loading-status').textContent = 'Done — loading results…';
+}
 </script>
 </body>
 </html>
