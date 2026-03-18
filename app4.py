@@ -735,18 +735,5 @@ def rate_limit_exceeded(e):
     }), 429
 
 
-# ── HEALTH CHECK ───────────────────────────────────────
-@app.route('/health')
-def health():
-    return jsonify({'status': 'ok', 'service': 'lumina'}), 200
-
-
-# ── 413 HANDLER ────────────────────────────────────────
-@app.errorhandler(413)
-def request_too_large(e):
-    return jsonify({'error': 'Request too large'}), 413
-
-
 if __name__ == '__main__':
-    env = os.getenv('FLASK_ENV', 'development')
-    app.run(host='0.0.0.0', port=5001, debug=(env == 'development'))
+    app.run(debug=True, port=5001)

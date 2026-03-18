@@ -233,12 +233,9 @@ def search_semantic_scholar(query: str, keywords: str, max_results=10) -> list:
         "limit": max_results,
         "fields": "title,authors,abstract,year,journal,externalIds,openAccessPdf",
     }
-    s2_key = os.getenv("S2_API_KEY", "")
     headers = {
         "User-Agent": "Lumina/1.0 (academic research tool; contact: lumina@research.app)",
     }
-    if s2_key:
-        headers["x-api-key"] = s2_key
     try:
         r = requests.get(url, params=params, headers=headers, timeout=15)
         print(f"Semantic Scholar status: {r.status_code}")
@@ -515,86 +512,24 @@ Papers:
     return enriched
 
 
-def prefilter_papers(topic: str, papers: list) -> list:
-    """
-    Fast keyword pre-filter — removes papers with zero topic signal
-    before sending to the AI. No API calls, pure Python.
-    Keeps papers where at least one meaningful topic term appears
-    in the title or abstract.
-    """
-    # Extract meaningful terms from topic — words over 4 chars, skip filler
-    stop = {'about','among','their','there','these','those','which','where',
-            'using','study','analysis','effect','impact','influence','between',
-            'university','undergraduate','students','research','papers','nigeria',
-            'nigerian','african','africa'}
-    topic_terms = [w.lower() for w in topic.split()
-                   if len(w) > 4 and w.lower() not in stop]
-
-    if not topic_terms:
-        return papers  # can't filter — return all
-
-    filtered = []
-    for p in papers:
-        text = (p.get('title','') + ' ' + p.get('abstract','')).lower()
-        # Keep if any meaningful topic term appears
-        if any(term in text for term in topic_terms):
-            filtered.append(p)
-
-    removed = len(papers) - len(filtered)
-    print(f"Pre-filter: removed {removed} irrelevant papers, {len(filtered)} remain")
-    return filtered
-
-
-def prioritise_papers(papers: list, strategy_queries: list) -> list:
-    """
-    Sort papers so the most targeted angles are ranked first.
-    This ensures that even if TPM limit hits mid-ranking,
-    the most relevant papers (exact topic, work-specific) are
-    already scored while broader theory papers get default scores.
-    """
-    # Exact topic and work-specific angles are highest priority
-    priority_labels = {'exact topic', 'exact', 'work specific', 'author scholarship'}
-    high = [p for p in papers if p.get('search_angle','').lower() in priority_labels]
-    low  = [p for p in papers if p.get('search_angle','').lower() not in priority_labels]
-    return high + low
-
-
-def rank_papers_with_ai(topic: str, papers: list, strategy_queries: list = None) -> list:
-    import time
+def rank_papers_with_ai(topic: str, papers: list) -> list:
     BATCH_SIZE = 10
-
-    # Step 1 — Pre-filter: remove papers with no topic signal
-    papers = prefilter_papers(topic, papers)
-
-    # Step 2 — Prioritise: exact/work-specific angles first
-    papers = prioritise_papers(papers, strategy_queries or [])
-
-    print(f"Ranking {len(papers)} papers after pre-filter")
-
     all_enriched = []
     for i in range(0, len(papers), BATCH_SIZE):
         batch = papers[i:i + BATCH_SIZE]
-        batch_num = i//BATCH_SIZE + 1
-        total_batches = (len(papers) + BATCH_SIZE - 1) // BATCH_SIZE
-        print(f"Ranking batch {batch_num}/{total_batches} ({len(batch)} papers)...")
-
-        # Retry with backoff only when a 429 actually hits — no artificial delays
+        print(f"Ranking batch {i//BATCH_SIZE + 1} ({len(batch)} papers)...")
+        # Retry up to 2 times on connection errors
         for attempt in range(3):
             try:
                 enriched = rank_batch(topic, batch)
                 all_enriched.extend(enriched)
                 break
             except Exception as e:
-                err = str(e)
-                if '429' in err or 'rate_limit' in err:
-                    # Groq TPM resets every 60s — wait long enough to clear it
-                    wait = 30 if attempt == 0 else 60
-                    print(f"TPM limit hit — waiting {wait}s before retry {attempt+1}...")
-                    time.sleep(wait)
-                elif attempt < 2 and ('Connection' in err or 'timeout' in err.lower()):
-                    print(f"Connection error, retrying in 2s...")
-                    time.sleep(2)
+                if attempt < 2 and ('Connection' in str(e) or 'timeout' in str(e).lower()):
+                    print(f"Ranking attempt {attempt+1} failed, retrying... ({e})")
+                    import time; time.sleep(2)
                 else:
+                    # Give batch a default score rather than crash entire search
                     print(f"Ranking batch failed after retries — using default scores")
                     all_enriched.extend([{**p, "score": 5, "relevance": "", "key_contribution": ""} for p in batch])
                     break
@@ -689,18 +624,10 @@ def search():
 
         # Step 4 — Remove papers with no title or abstract
         unique_papers = [p for p in unique_papers if p.get("title") and p.get("abstract")]
-        
-        # Cap at 100 papers before ranking — prevents Groq per-minute rate limit
-        # With 10 papers per batch, 100 papers = 10 batches = safe within rate limits
-        if len(unique_papers) > 100:
-            import random
-            # Keep diverse sources — sample proportionally rather than just truncating
-            unique_papers = unique_papers[:100]
-        
         print(f"\nTotal unique papers with abstracts: {len(unique_papers)}")
 
         # Step 5 — Rank all papers against the original full topic
-        ranked = rank_papers_with_ai(topic, unique_papers, strategy_queries=queries)
+        ranked = rank_papers_with_ai(topic, unique_papers)
         try:
             signal.alarm(0)  # Cancel timeout on success
         except (AttributeError, OSError):
@@ -735,18 +662,5 @@ def rate_limit_exceeded(e):
     }), 429
 
 
-# ── HEALTH CHECK ───────────────────────────────────────
-@app.route('/health')
-def health():
-    return jsonify({'status': 'ok', 'service': 'lumina'}), 200
-
-
-# ── 413 HANDLER ────────────────────────────────────────
-@app.errorhandler(413)
-def request_too_large(e):
-    return jsonify({'error': 'Request too large'}), 413
-
-
 if __name__ == '__main__':
-    env = os.getenv('FLASK_ENV', 'development')
-    app.run(host='0.0.0.0', port=5001, debug=(env == 'development'))
+    app.run(debug=True, port=5001)

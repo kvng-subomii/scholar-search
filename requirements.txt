@@ -3,3 +3,4 @@ flask-cors
 groq
 python-dotenv
 requests
+flask-limiter
