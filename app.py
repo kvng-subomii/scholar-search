@@ -10,7 +10,6 @@ import xml.etree.ElementTree as ET
 from dotenv import load_dotenv
 from groq import Groq
 import logging
-import signal
 
 load_dotenv()
 
@@ -636,15 +635,6 @@ def search():
     if len(topic) < 3:
         return jsonify({'error': 'Topic too short — please enter at least 3 characters'}), 400
 
-    # Set hard timeout (Linux/Render only — ignored on Windows dev)
-    def _timeout_handler(signum, frame):
-        raise TimeoutError("Search exceeded time limit")
-    try:
-        signal.signal(signal.SIGALRM, _timeout_handler)
-        signal.alarm(55)
-    except (AttributeError, OSError):
-        pass  # SIGALRM not available on Windows — skip silently
-
     try:
         # Step 1 — Generate comprehensive multi-angle search strategy
         strategy = generate_search_strategy(topic)
@@ -701,26 +691,15 @@ def search():
 
         # Step 5 — Rank all papers against the original full topic
         ranked = rank_papers_with_ai(topic, unique_papers, strategy_queries=queries)
-        try:
-            signal.alarm(0)  # Cancel timeout on success
-        except (AttributeError, OSError):
-            pass
         return jsonify({
             'results': ranked,
             'sub_topics': sub_topics,
             'angles_searched': len(queries)
         })
 
-    except TimeoutError:
-        logger.error("Search timed out after 55 seconds")
-        return jsonify({'error': 'Search timed out. Please try a more specific topic.'}), 504
     except Exception as e:
         err_str = str(e)
         logger.error(f"Search error: {err_str}")
-        try:
-            signal.alarm(0)
-        except (AttributeError, OSError):
-            pass
         if '429' in err_str or 'rate_limit' in err_str or 'Rate limit' in err_str:
             return jsonify({'error': 'rate_limit', 'message': 'Groq daily token limit reached. Please try again tomorrow.'}), 429
         return jsonify({'error': 'An internal error occurred. Please try again.'}), 500
