@@ -716,6 +716,7 @@ def rate_limit_exceeded(e):
 
 # ── HEALTH CHECK ───────────────────────────────────────
 @app.route('/health')
+@limiter.exempt
 def health():
     return jsonify({'status': 'ok', 'service': 'lumina'}), 200
 
