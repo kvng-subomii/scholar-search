@@ -180,7 +180,7 @@
 
     .hero-desc {
       max-width: 520px;
-      font-size: 14px;
+      font-size: 16px;
       line-height: 1.9;
       color: var(--ink-mid);
       margin-bottom: 48px;
@@ -766,22 +766,22 @@
     }
 
     .meta-authors {
-      font-size: 11px;
+      font-size: 13px;
       color: var(--ink-mid);
       font-style: italic;
     }
 
-    .meta-sep { color: var(--ink-faint); font-size: 11px; }
+    .meta-sep { color: var(--ink-faint); font-size: 13px; }
 
     .meta-year {
-      font-size: 11px;
+      font-size: 13px;
       font-weight: 700;
       color: var(--ink-mid);
       letter-spacing: 0.05em;
     }
 
     .meta-journal {
-      font-size: 11px;
+      font-size: 13px;
       color: var(--ink-faint);
       font-style: italic;
     }
@@ -812,7 +812,7 @@
     .src-epmc       { color: #3a6b1a;              border-color: #3a6b1a; }
 
     .paper-abstract {
-      font-size: 13px;
+      font-size: 15px;
       line-height: 1.85;
       color: var(--ink-mid);
       margin-bottom: 18px;
@@ -832,7 +832,7 @@
       display: flex;
       gap: 10px;
       align-items: flex-start;
-      font-size: 12px;
+      font-size: 14px;
       color: var(--ink-mid);
       line-height: 1.7;
     }
@@ -1122,6 +1122,113 @@
       .careers-section { padding: 40px 20px 60px; }
       footer { flex-direction: column; gap: 8px; padding: 20px; text-align: center; }
     }
+    /* ── YEAR FILTER BAR ── */
+    .filter-bar {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      background: white;
+      border: 2px solid var(--ink);
+      border-left: 6px solid var(--yellow);
+      padding: 14px 20px;
+      margin-bottom: 20px;
+      box-shadow: 3px 3px 0 var(--ink);
+      position: relative;
+      z-index: 10;
+    }
+    .filter-bar.visible { display: flex; }
+    .filter-label {
+      font-family: 'Courier Prime', monospace;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--ink);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .filter-year-input {
+      width: 72px;
+      border: 2px solid var(--ink);
+      background: var(--paper);
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--ink);
+      padding: 5px 8px;
+      outline: none;
+      text-align: center;
+    }
+    .filter-year-input:focus { background: var(--yellow); }
+    .filter-sep {
+      font-family: 'Courier Prime', monospace;
+      font-size: 13px;
+      color: var(--ink-faint);
+    }
+    .filter-apply-btn {
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 7px 18px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .filter-apply-btn:hover { background: var(--red); }
+    .filter-clear-btn {
+      background: transparent;
+      color: var(--ink-faint);
+      border: 1.5px solid var(--ink-faint);
+      font-family: 'Courier Prime', monospace;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .filter-clear-btn:hover { border-color: var(--ink); color: var(--ink); }
+    .filter-count {
+      font-family: 'Courier Prime', monospace;
+      font-size: 10px;
+      color: var(--ink-faint);
+      font-style: italic;
+      margin-left: auto;
+    }
+
+    /* ── WHILE YOU WAIT ── */
+    .while-you-wait {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .wyw-label {
+      font-family: 'Courier Prime', monospace;
+      font-size: 9px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 6px;
+    }
+    .wyw-heading {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 32px;
+      font-weight: 900;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .wyw-sub {
+      font-family: 'Courier Prime', monospace;
+      font-size: 11px;
+      color: var(--ink-mid);
+      margin-top: 6px;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -1209,6 +1316,12 @@
     <div class="progress-label" id="progress-label">Generating search strategy...</div>
   </div>
 
+  <div class="while-you-wait">
+    <div class="wyw-label">— don't just stare at a loading bar —</div>
+    <div class="wyw-heading">While you wait</div>
+    <div class="wyw-sub">Pick a number and answer a research trivia question</div>
+  </div>
+
   <div class="game-board-wrap">
     <div class="game-score-bar">
       <div class="game-score-display">Score: <span id="gb-score">0</span> / <span id="gb-answered">0</span></div>
@@ -1241,6 +1354,18 @@
       <div class="results-query" id="results-query"></div>
     </div>
   </div>
+
+  <!-- YEAR FILTER -->
+  <div class="filter-bar" id="filter-bar">
+    <span class="filter-label">Filter by year</span>
+    <input class="filter-year-input" type="number" id="filter-from" placeholder="1990" min="1900" max="2025"/>
+    <span class="filter-sep">—</span>
+    <input class="filter-year-input" type="number" id="filter-to" placeholder="2025" min="1900" max="2025"/>
+    <button class="filter-apply-btn" onclick="applyYearFilter()">Apply →</button>
+    <button class="filter-clear-btn" onclick="clearYearFilter()">Clear</button>
+    <span class="filter-count" id="filter-count"></span>
+  </div>
+
   <div id="results"></div>
 </div>
 
@@ -1285,7 +1410,7 @@ function srcClass(s) {
 
 function scoreClass(s) { return s >= 8 ? 'high' : s >= 5 ? 'mid' : 'low'; }
 
-let allPapers = [], shownCount = 0;
+let allPapers = [], shownCount = 0, filteredPapers = null;
 const PAGE = 8;
 
 async function doSearch() {
@@ -1302,6 +1427,8 @@ async function doSearch() {
   section.style.display = 'none';
   el.innerHTML = '';
   err.classList.remove('active');
+  document.getElementById('filter-bar').classList.remove('visible');
+  filteredPapers = null;
   loading.scrollIntoView({ behavior: 'smooth', block: 'center' });
   startTrivia();
   startProgress();
@@ -1362,6 +1489,11 @@ async function doSearch() {
     shownCount = 0;
     const lm = document.getElementById('load-more-wrap');
     if (lm) lm.remove();
+    // Show filter bar
+    document.getElementById('filter-bar').classList.add('visible');
+    document.getElementById('filter-count').textContent = '';
+    document.getElementById('filter-from').value = '';
+    document.getElementById('filter-to').value = '';
     renderBatch();
     // Show low results warning for niche topics
     const oldLowBanner = document.getElementById('low-results-banner');
@@ -1443,6 +1575,47 @@ function updateLoadMore(shown) {
     '<button class="load-more-btn" onclick="renderBatch()">Load ' + Math.min(rem, PAGE) + ' more papers ↓</button>' +
     '<div class="load-more-count">' + rem + ' remaining</div>';
   document.getElementById('results').after(wrap);
+}
+
+/* YEAR FILTER */
+
+function applyYearFilter() {
+  const from = parseInt(document.getElementById('filter-from').value) || 0;
+  const to   = parseInt(document.getElementById('filter-to').value)   || 9999;
+  filteredPapers = allPapers.filter(p => {
+    const y = parseInt(p.year);
+    if (!y) return false; // exclude papers with no year when filter is active
+    return y >= from && y <= to;
+  });
+  const el = document.getElementById('results');
+  el.innerHTML = '';
+  const lm = document.getElementById('load-more-wrap');
+  if (lm) lm.remove();
+  if (filteredPapers.length === 0) {
+    el.innerHTML = '<div style="font-family:\'Courier Prime\',monospace;font-size:13px;color:var(--ink-faint);padding:32px 0;text-align:center;">No papers found in that year range. <a href="#" onclick="clearYearFilter();return false;" style="color:var(--ink);text-decoration:underline;">Clear filter</a></div>';
+    document.getElementById('filter-count').textContent = '0 papers';
+    document.getElementById('results-num').textContent = '0';
+    return;
+  }
+  document.getElementById('filter-count').textContent = filteredPapers.length + ' papers shown';
+  document.getElementById('results-num').textContent = filteredPapers.length;
+  const prev = allPapers;
+  allPapers = filteredPapers;
+  renderBatch();
+  allPapers = prev;
+}
+
+function clearYearFilter() {
+  filteredPapers = null;
+  document.getElementById('filter-from').value = '';
+  document.getElementById('filter-to').value = '';
+  document.getElementById('filter-count').textContent = '';
+  document.getElementById('results-num').textContent = allPapers.length;
+  const el = document.getElementById('results');
+  el.innerHTML = '';
+  const lm = document.getElementById('load-more-wrap');
+  if (lm) lm.remove();
+  renderBatch();
 }
 
 /* CAREERS */

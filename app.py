@@ -604,7 +604,7 @@ def rank_papers_with_ai(topic: str, papers: list, strategy_queries: list = None)
         relevant = [p for p in ranked if p["score"] >= threshold]
         if len(relevant) >= 5:
             print(f"Threshold used: {threshold} — {len(relevant)} papers passed")
-            return relevant[:30]
+            return relevant[:70]
 
     print("Very niche topic — returning top results")
     return ranked[:5]
