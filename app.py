@@ -10,6 +10,12 @@ import xml.etree.ElementTree as ET
 from dotenv import load_dotenv
 from groq import Groq
 import logging
+import functools
+import threading
+import hashlib
+from datetime import datetime, timezone
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
 
@@ -54,6 +60,36 @@ try:
 except Exception as e:
     logger.error(f"Groq client init failed: {e}")
     client = None
+
+# ── IN-MEMORY STATS ────────────────────────────────────
+# Resets on every Render restart (free tier spins down). Tracks activity
+# within the current uptime window only. No DB required.
+_stats_lock = threading.Lock()
+_stats = {
+    "started_at": datetime.now(timezone.utc),
+    "total_searches": 0,
+    "unique_ip_hashes": set(),
+    "searches_by_hour": defaultdict(int),   # "YYYY-MM-DD HH" → count
+    "recent_activity": [],                  # last 100 events
+}
+
+def _record_search(ip: str, topic: str, result_count: int):
+    """Thread-safe. Called after every successful search."""
+    ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:12]
+    hour_key = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:00")
+    entry = {
+        "time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "ip_hash": ip_hash,
+        "topic_length": len(topic),
+        "results": result_count,
+    }
+    with _stats_lock:
+        _stats["total_searches"] += 1
+        _stats["unique_ip_hashes"].add(ip_hash)
+        _stats["searches_by_hour"][hour_key] += 1
+        _stats["recent_activity"].insert(0, entry)
+        _stats["recent_activity"] = _stats["recent_activity"][:100]
+
 
 # ── HTTPS REDIRECT ─────────────────────────────────────
 @app.before_request
@@ -610,6 +646,50 @@ def rank_papers_with_ai(topic: str, papers: list, strategy_queries: list = None)
     return ranked[:5]
 
 
+# ── PARALLEL SEARCH HELPER ─────────────────────────────
+def search_all_sources_for_angle(angle: dict, topic: str) -> list:
+    """
+    Search all 8 databases for a single angle simultaneously using threads.
+    Each database call runs in its own thread — the angle finishes in the
+    time of the slowest single database call, not the sum of all of them.
+    """
+    q   = angle.get("query", topic)
+    kw  = angle.get("keywords", extract_keywords(q))
+    label = angle.get("label", "Search")
+    print(f"\nSearching angle: [{label}]")
+
+    tasks = [
+        functools.partial(search_arxiv, q, kw, max_results=8),
+        functools.partial(search_semantic_scholar, q, kw, max_results=8),
+        functools.partial(search_pubmed, q, kw, max_results=8),
+        functools.partial(search_crossref, q, kw, max_results=8),
+        functools.partial(search_openalex, q, kw, label="AJOL", max_results=8),
+        functools.partial(
+            search_openalex, q, kw,
+            domain_filter="primary_topic.domain.id:https://openalex.org/domains/2|https://openalex.org/domains/4",
+            label="ERIC", max_results=8
+        ),
+        functools.partial(search_core, q, kw, max_results=8),
+        functools.partial(search_doaj, q, kw, max_results=8),
+    ]
+
+    angle_papers = []
+    with ThreadPoolExecutor(max_workers=8) as db_executor:
+        futures = {db_executor.submit(task): task.func.__name__ for task in tasks}
+        for future in as_completed(futures):
+            try:
+                papers = future.result()
+                angle_papers.extend(papers)
+            except Exception as e:
+                print(f"Source error in angle [{label}]: {e}")
+
+    for p in angle_papers:
+        p["search_angle"] = label
+
+    print(f"Angle [{label}]: {len(angle_papers)} papers collected")
+    return angle_papers
+
+
 # ── ROUTES ─────────────────────────────────────────────
 @app.route('/')
 def index():
@@ -641,33 +721,24 @@ def search():
         queries = strategy["queries"]
         sub_topics = strategy["sub_topics"]
 
-        # Step 2 — Search all 8 sources for every angle in the strategy
+        # Step 2 — Search all angles in parallel (each angle searches all 8
+        # databases simultaneously). Total time ≈ slowest single request,
+        # not the sum of all 48 requests.
         all_papers = []
         seen_titles = set()
 
-        for angle in queries:
-            q = angle.get("query", topic)
-            kw = angle.get("keywords", extract_keywords(q))
-            label = angle.get("label", "Search")
-            print(f"\nSearching angle: [{label}]")
-
-            angle_papers = []
-            angle_papers += search_arxiv(q, kw, max_results=8)
-            angle_papers += search_semantic_scholar(q, kw, max_results=8)
-            angle_papers += search_pubmed(q, kw, max_results=8)
-            angle_papers += search_crossref(q, kw, max_results=8)
-            angle_papers += search_openalex(q, kw, label="AJOL", max_results=8)
-            angle_papers += search_openalex(q, kw,
-                domain_filter="primary_topic.domain.id:https://openalex.org/domains/2|https://openalex.org/domains/4",
-                label="ERIC", max_results=8)
-            angle_papers += search_core(q, kw, max_results=8)
-            angle_papers += search_doaj(q, kw, max_results=8)
-
-            # Tag each paper with its search angle for transparency
-            for p in angle_papers:
-                p["search_angle"] = label
-
-            all_papers += angle_papers
+        with ThreadPoolExecutor(max_workers=len(queries)) as angle_executor:
+            angle_futures = {
+                angle_executor.submit(search_all_sources_for_angle, angle, topic): angle.get("label", "Search")
+                for angle in queries
+            }
+            for future in as_completed(angle_futures):
+                label = angle_futures[future]
+                try:
+                    angle_papers = future.result()
+                    all_papers.extend(angle_papers)
+                except Exception as e:
+                    print(f"Angle [{label}] failed: {e}")
 
         # Step 3 — Deduplicate by normalised title
         unique_papers = []
@@ -691,6 +762,14 @@ def search():
 
         # Step 5 — Rank all papers against the original full topic
         ranked = rank_papers_with_ai(topic, unique_papers, strategy_queries=queries)
+
+        # Record activity for admin dashboard
+        _record_search(
+            ip=request.remote_addr or "unknown",
+            topic=topic,
+            result_count=len(ranked),
+        )
+
         return jsonify({
             'results': ranked,
             'sub_topics': sub_topics,
@@ -712,6 +791,84 @@ def rate_limit_exceeded(e):
         'error': 'rate_limit',
         'message': 'Too many searches. You are limited to 5 per minute and 30 per hour. Please wait a moment and try again.'
     }), 429
+
+
+# ── ADMIN DASHBOARD ────────────────────────────────────
+@app.route('/admin')
+@limiter.exempt
+def admin():
+    key = request.args.get('key', '')
+    admin_key = os.getenv('ADMIN_KEY', '')
+    if not admin_key or key != admin_key:
+        return '<h2 style="font-family:monospace;margin:2rem">401 — Not authorised.</h2>', 401
+
+    with _stats_lock:
+        total        = _stats["total_searches"]
+        unique_users = len(_stats["unique_ip_hashes"])
+        started_at   = _stats["started_at"].strftime("%Y-%m-%d %H:%M UTC")
+        uptime_hrs   = round((datetime.now(timezone.utc) - _stats["started_at"]).total_seconds() / 3600, 1)
+        by_hour      = dict(sorted(_stats["searches_by_hour"].items(), reverse=True)[:24])
+        recent       = list(_stats["recent_activity"][:20])
+
+    by_hour_rows = "".join(
+        f"<tr><td>{h}</td><td>{c}</td></tr>" for h, c in by_hour.items()
+    )
+    activity_rows = "".join(
+        f"<tr><td>{e['time']}</td><td>{e['ip_hash']}</td>"
+        f"<td>{e['topic_length']} chars</td><td>{e['results']}</td></tr>"
+        for e in recent
+    )
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lumina — Admin</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:'Courier New',monospace;background:#0a0a0a;color:#e0e0e0;padding:2rem}}
+  h1{{font-size:1.4rem;color:#fff;margin-bottom:.25rem;letter-spacing:.05em}}
+  .sub{{color:#555;font-size:.8rem;margin-bottom:2.5rem}}
+  .grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:2.5rem}}
+  .card{{background:#111;border:1px solid #222;border-radius:6px;padding:1.25rem}}
+  .card .val{{font-size:2rem;font-weight:700;color:#fff;line-height:1}}
+  .card .lbl{{font-size:.7rem;color:#555;margin-top:.4rem;text-transform:uppercase;letter-spacing:.08em}}
+  h2{{font-size:.85rem;color:#555;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem}}
+  table{{width:100%;border-collapse:collapse;margin-bottom:2.5rem;font-size:.8rem}}
+  th{{text-align:left;color:#444;padding:.4rem .75rem;border-bottom:1px solid #1a1a1a;font-weight:normal}}
+  td{{padding:.4rem .75rem;border-bottom:1px solid #151515;color:#aaa}}
+  tr:hover td{{background:#111}}
+  .note{{font-size:.72rem;color:#333;margin-top:1rem}}
+</style>
+</head>
+<body>
+<h1>LUMINA / ADMIN</h1>
+<p class="sub">Session started {started_at} &nbsp;·&nbsp; uptime {uptime_hrs}h &nbsp;·&nbsp; resets on restart</p>
+
+<div class="grid">
+  <div class="card"><div class="val">{total}</div><div class="lbl">Total searches</div></div>
+  <div class="card"><div class="val">{unique_users}</div><div class="lbl">Unique visitors</div></div>
+  <div class="card"><div class="val">{uptime_hrs}h</div><div class="lbl">Uptime</div></div>
+  <div class="card"><div class="val">{round(total/max(uptime_hrs,0.01),1)}</div><div class="lbl">Searches / hr</div></div>
+</div>
+
+<h2>Activity by hour (last 24)</h2>
+<table>
+  <tr><th>Hour (UTC)</th><th>Searches</th></tr>
+  {by_hour_rows if by_hour_rows else '<tr><td colspan="2" style="color:#333">No data yet</td></tr>'}
+</table>
+
+<h2>Recent searches (last 20)</h2>
+<table>
+  <tr><th>Time (UTC)</th><th>Visitor</th><th>Topic size</th><th>Results</th></tr>
+  {activity_rows if activity_rows else '<tr><td colspan="4" style="color:#333">No data yet</td></tr>'}
+</table>
+
+<p class="note">IPs are one-way hashed — not recoverable. Topics are not stored, only their character length.</p>
+</body>
+</html>"""
+    return html
 
 
 # ── HEALTH CHECK ───────────────────────────────────────
