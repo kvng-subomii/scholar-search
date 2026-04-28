@@ -159,39 +159,63 @@ def generate_search_strategy(topic: str) -> dict:
     """
     prompt = f"""You are an expert academic research librarian helping a student build a comprehensive literature review.
 
-Given this research topic, generate a multi-angle search strategy with up to 6 targeted search queries.
-Each query must serve a DIFFERENT purpose so the student gets broad, comprehensive coverage.
+Given this research topic, FIRST identify the topic type, then generate a multi-angle search strategy with up to 6 targeted search queries. Each query must serve a DIFFERENT purpose.
 
 Research topic: "{topic}"
 
-Generate queries for ALL applicable angles:
-1. EXACT TOPIC — search for the topic exactly as stated
-2. THEMATIC — search for the core themes/concepts in other literary texts or contexts (not just this specific work)
-3. WORK SPECIFIC — one query per named literary work, author, or text mentioned (if any)
-4. AUTHOR SCHOLARSHIP — search for academic papers written BY or ABOUT the named authors
-5. COMPARATIVE — search for papers comparing or contextualising the themes across similar works
-6. BROADER FIELD — search for foundational theory papers on the core concept (e.g. postcolonial theory, religious extremism in literature)
+STEP 1 — Identify the topic type:
+- BIOMEDICAL/PHARMACOLOGICAL: contains drug names, compounds, animal models, diseases, biochemical mechanisms, lab methods (e.g. Y-maze, ELISA, PCR), species names
+- SCIENTIFIC (non-biomedical): physics, chemistry, engineering, environmental science
+- SOCIAL SCIENCE: sociology, psychology, economics, education, policy
+- LITERARY/HUMANITIES: novels, authors, literary theory, cultural analysis
+- MIXED: combines two or more of the above
 
-RULES:
+STEP 2 — Generate angles based on type:
+
+FOR BIOMEDICAL/PHARMACOLOGICAL topics, generate ALL applicable angles from this list:
+1. EXACT TOPIC — the full specific topic as stated
+2. COMPOUND SYNONYMS — search using alternative names for the key compound/drug. CRITICAL: many compounds have multiple names (e.g. carnosic acid = rosemary extract = Rosmarinus officinalis; methotrexate = MTX; paracetamol = acetaminophen). Search for the synonym form that literature commonly uses.
+3. DRUG/COMPOUND MECHANISM — how does the key compound/drug work? (e.g. antioxidant mechanism, NF-kB pathway, oxidative stress)
+4. TOXICITY/DISEASE MODEL — search specifically for the injury or disease model (e.g. methotrexate-induced neurotoxicity, chemotherapy cognitive impairment)
+5. BEHAVIOURAL/ASSESSMENT MODEL — search for the specific test or model used (e.g. Y-maze spontaneous alternation, Morris water maze, open field test)
+6. BROADER NEUROPROTECTION/PHARMACOLOGY — search for the broader intervention category (e.g. natural compounds neuroprotection, plant extract cognitive impairment rodent)
+
+FOR LITERARY/HUMANITIES topics, generate:
+1. EXACT TOPIC
+2. THEMATIC — core themes across other works
+3. WORK SPECIFIC — one query per named work/author
+4. AUTHOR SCHOLARSHIP — papers about the named authors
+5. COMPARATIVE — cross-work comparisons
+6. BROADER FIELD — foundational theory
+
+FOR SOCIAL SCIENCE topics, generate:
+1. EXACT TOPIC
+2. CORE CONCEPT — the main phenomenon studied
+3. METHODOLOGY — research design or measurement approach used
+4. POPULATION/CONTEXT — the specific group or setting
+5. THEORETICAL FRAMEWORK — underlying theory
+6. RELATED EMPIRICAL — similar studies in adjacent populations
+
+RULES FOR ALL TYPES:
 - Each query must be meaningfully different — no near-duplicates
 - Keep queries concise and searchable (under 10 words each)
-- For literary topics, always include at least one work-specific and one thematic query
-- For social science topics, include methodology and theory queries
+- For biomedical topics: ALWAYS include at least one synonym/alternative-name angle — this is the most commonly missed angle and causes huge gaps in results
 - Maximum 6 queries total
 
 Return ONLY a valid JSON array. Each item must have:
-- "label": short name for this search angle (e.g. "Exact topic", "Radical faith in literature", "Obinna Udenwe's Satan and Shaitans")
-- "query": the full search string to use
-- "keywords": 4-6 key terms extracted from the query
+- "label": short descriptive name for this angle
+- "query": the actual search string
+- "keywords": 4-6 key terms from the query
+- "topic_type": one of "biomedical", "scientific", "social_science", "literary", "mixed"
 
-Example for "radical faith and manipulation in Obinna Udenwe's Satan and Shaitans and Elnathan John's Born on a Tuesday":
+Example for "investigating the effect of oral carnosic acid supplementation on methotrexate-induced memory impairment in male Wistar rats using the Y-maze model":
 [
-  {{"label": "Exact topic", "query": "radical faith political manipulation Nigerian fiction Udenwe Elnathan John", "keywords": "radical faith manipulation Nigerian fiction Udenwe Elnathan"}},
-  {{"label": "Radical faith in African literature", "query": "radical faith religious extremism African literature fiction", "keywords": "radical faith religious extremism African literature"}},
-  {{"label": "Obinna Udenwe Satan and Shaitans", "query": "Obinna Udenwe Satan Shaitans novel", "keywords": "Obinna Udenwe Satan Shaitans"}},
-  {{"label": "Elnathan John Born on a Tuesday", "query": "Elnathan John Born on a Tuesday novel", "keywords": "Elnathan John Born Tuesday novel"}},
-  {{"label": "Political manipulation Nigerian novels", "query": "political manipulation religion Nigerian contemporary fiction", "keywords": "political manipulation religion Nigerian fiction"}},
-  {{"label": "Postcolonial religion African fiction theory", "query": "postcolonial theory religion extremism African novel", "keywords": "postcolonial religion extremism African novel"}}
+  {{"label": "Exact topic", "query": "carnosic acid methotrexate memory impairment Wistar rats Y-maze", "keywords": "carnosic acid methotrexate memory impairment rats", "topic_type": "biomedical"}},
+  {{"label": "Rosemary extract synonyms", "query": "rosemary extract Rosmarinus officinalis cognitive function neuroprotection rats", "keywords": "rosemary extract Rosmarinus officinalis cognitive neuroprotection", "topic_type": "biomedical"}},
+  {{"label": "Methotrexate neurotoxicity", "query": "methotrexate induced cognitive impairment neurotoxicity brain rats", "keywords": "methotrexate cognitive impairment neurotoxicity brain", "topic_type": "biomedical"}},
+  {{"label": "Carnosic acid neuroprotection mechanism", "query": "carnosic acid oxidative stress neuroprotection antioxidant brain", "keywords": "carnosic acid oxidative stress neuroprotection antioxidant", "topic_type": "biomedical"}},
+  {{"label": "Y-maze spatial memory rodents", "query": "Y-maze spontaneous alternation spatial memory rodent model", "keywords": "Y-maze spontaneous alternation spatial memory rodent", "topic_type": "biomedical"}},
+  {{"label": "Natural compounds chemotherapy cognitive impairment", "query": "natural compound plant extract chemotherapy cognitive impairment neuroprotection animal model", "keywords": "natural compound chemotherapy cognitive impairment neuroprotection", "topic_type": "biomedical"}}
 ]
 
 Now generate the search strategy for: "{topic}"
@@ -550,28 +574,72 @@ Papers:
     return enriched
 
 
-def prefilter_papers(topic: str, papers: list) -> list:
+def is_niche_topic(topic: str) -> bool:
+    """
+    Detect whether a topic is highly specific/scientific.
+    Niche topics need a looser prefilter because relevant papers
+    may use synonyms or alternative nomenclature that don't appear
+    in the raw topic string.
+    Signals: chemical compound names, drug names, animal model names,
+    lab assay names, Latin species names, abbreviations.
+    """
+    niche_signals = [
+        # Animal models
+        r'\b(wistar|sprague|dawley|mice|mouse|rat|rats|murine|rodent|rabbit|zebra.?fish)\b',
+        # Lab methods / behavioural models
+        r'\b(y.maze|morris.water|open.field|forced.swim|elevated.plus|novel.object|radial.arm|barnes.maze|elisa|pcr|western.blot|immunohistochem|histopath)\b',
+        # Drug/compound indicators
+        r'\b(acid|oxide|amine|ase|ine|ol\b|ate\b|ium\b|ide\b)',
+        # Biomedical terminology
+        r'\b(induced|supplementation|administration|toxicity|neuroprotection|oxidative.stress|apoptosis|inflammation|cytokine|neurotoxic|hepatotoxic|nephrotoxic|cognitive|hippocampus|cortex|neuron)\b',
+        # Latin / scientific nomenclature
+        r'\b[A-Z][a-z]+ [a-z]+\b',  # e.g. Rosmarinus officinalis
+    ]
+    topic_lower = topic.lower()
+    hits = sum(1 for sig in niche_signals if re.search(sig, topic_lower))
+    return hits >= 2  # 2+ signals = treat as niche
+
+
+def prefilter_papers(topic: str, papers: list, strategy_queries: list = None) -> list:
     """
     Fast keyword pre-filter — removes papers with zero topic signal
     before sending to the AI. No API calls, pure Python.
-    Keeps papers where at least one meaningful topic term appears
-    in the title or abstract.
+
+    For broad topics: keeps papers where any meaningful topic term appears.
+    For niche/scientific topics: expands the term pool using all keywords
+    from the search strategy angles, so synonym-based papers (e.g. a paper
+    about 'rosemary extract' when the topic says 'carnosic acid') are kept.
     """
-    # Extract meaningful terms from topic — words over 4 chars, skip filler
     stop = {'about','among','their','there','these','those','which','where',
             'using','study','analysis','effect','impact','influence','between',
             'university','undergraduate','students','research','papers','nigeria',
-            'nigerian','african','africa'}
-    topic_terms = [w.lower() for w in topic.split()
-                   if len(w) > 4 and w.lower() not in stop]
+            'nigerian','african','africa','investigate','investigating','effect',
+            'male','female','oral','model','induced','based'}
+
+    # Extract meaningful terms from the original topic
+    topic_terms = [w.lower() for w in re.split(r'\W+', topic)
+                   if len(w) > 3 and w.lower() not in stop]
+
+    # For niche topics: also pull all keywords from every search angle
+    # This gives us synonym coverage — angle 2 might have "rosemary extract"
+    # even though the topic only says "carnosic acid"
+    if is_niche_topic(topic) and strategy_queries:
+        for angle in strategy_queries:
+            kw_string = angle.get('keywords', '')
+            query_string = angle.get('query', '')
+            for word in re.split(r'\W+', kw_string + ' ' + query_string):
+                w = word.lower()
+                if len(w) > 3 and w not in stop:
+                    topic_terms.append(w)
+        topic_terms = list(set(topic_terms))
+        print(f"Niche topic detected — expanded prefilter pool to {len(topic_terms)} terms")
 
     if not topic_terms:
-        return papers  # can't filter — return all
+        return papers
 
     filtered = []
     for p in papers:
-        text = (p.get('title','') + ' ' + p.get('abstract','')).lower()
-        # Keep if any meaningful topic term appears
+        text = (p.get('title', '') + ' ' + p.get('abstract', '')).lower()
         if any(term in text for term in topic_terms):
             filtered.append(p)
 
@@ -599,7 +667,8 @@ def rank_papers_with_ai(topic: str, papers: list, strategy_queries: list = None)
     BATCH_SIZE = 10
 
     # Step 1 — Pre-filter: remove papers with no topic signal
-    papers = prefilter_papers(topic, papers)
+    # Pass strategy_queries so niche topics can use angle keywords as synonyms
+    papers = prefilter_papers(topic, papers, strategy_queries=strategy_queries or [])
 
     # Step 2 — Prioritise: exact/work-specific angles first
     papers = prioritise_papers(papers, strategy_queries or [])
