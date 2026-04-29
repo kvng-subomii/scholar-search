@@ -1341,8 +1341,8 @@
 <!-- ERROR -->
 <div class="error-msg" id="error-msg">
   <div class="error-glyph">✗</div>
-  <div class="error-title" id="error-title">Something broke.</div>
-  <div class="error-sub" id="error-sub">Make sure app.py is running on port 5001.</div>
+  <div class="error-title" id="error-title">Something went wrong.</div>
+  <div class="error-sub" id="error-sub">Please try again in a moment.</div>
 </div>
 
 <!-- RESULTS -->
@@ -1453,7 +1453,23 @@ async function doSearch() {
       btn.disabled = false;
       return;
     }
-    if (!res.ok) throw new Error(data.error || 'Unknown error');
+    // Handle Groq / Together AI rate limit returned as 503 or other non-ok status
+    if (!res.ok) {
+      loading.classList.remove('active');
+      stopProgress();
+      stopDots();
+      const errorType = data?.error || '';
+      const isRateLimit = errorType === 'rate_limit' || res.status === 503;
+      document.getElementById('error-title').textContent = isRateLimit
+        ? 'AI service is busy.'
+        : 'Something went wrong.';
+      document.getElementById('error-sub').textContent = isRateLimit
+        ? 'The AI provider has hit its rate limit. Try again in a minute — or wait a few minutes if the issue persists.'
+        : 'Please try again in a moment.';
+      err.classList.add('active');
+      btn.disabled = false;
+      return;
+    }
     loading.classList.remove('active');
     stopProgress();
     stopDots();
@@ -1518,10 +1534,12 @@ async function doSearch() {
 
     section.style.display = 'block';
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  } catch {
+  } catch (e) {
     loading.classList.remove('active');
     stopProgress();
     stopDots();
+    document.getElementById('error-title').textContent = 'Something went wrong.';
+    document.getElementById('error-sub').textContent = 'Please try again in a moment.';
     err.classList.add('active');
   } finally {
     btn.disabled = false;
