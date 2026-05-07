@@ -5,10 +5,12 @@ from flask_limiter.util import get_remote_address
 import os
 import json
 import re
+import hmac
 import requests
 import xml.etree.ElementTree as ET
 from dotenv import load_dotenv
 from groq import Groq
+from openai import OpenAI
 import logging
 import functools
 import threading
@@ -27,26 +29,24 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ── STARTUP VALIDATION ─────────────────────────────────
-if not os.getenv("GROQ_API_KEY"):
-    raise ValueError("GROQ_API_KEY is not set. Check your .env file.")
+if not os.getenv("GROQ_API_KEY") and not os.getenv("TOGETHER_API_KEY") and not os.getenv("OPENROUTER_API_KEY"):
+    raise ValueError("No LLM provider key found. Set at least one of: GROQ_API_KEY, TOGETHER_API_KEY, OPENROUTER_API_KEY")
 
-app = Flask(__name__, static_folder='.')
+app = Flask(__name__, static_folder=None)
 
 # ── SECURITY CONFIG ────────────────────────────────────
 app.config['DEBUG'] = False
 app.config['TESTING'] = False
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024  # 16KB max request body
+app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024  # 25MB — allows PDF uploads for citation tool
 
-# ── CORS — locked to known origins ─────────────────────
+# ── CORS ───────────────────────────────────────────────
 CORS(app, origins=[
-    "https://lumina.onrender.com",
+    "https://lumina-jgnu.onrender.com",
     "http://127.0.0.1:5001",
     "http://localhost:5001",
 ])
 
 # ── RATE LIMITING ──────────────────────────────────────
-# Global: 200 searches/day across ALL users (protects Groq token budget)
-# Per-IP: 30/hour, 5/minute
 limiter = Limiter(
     get_remote_address,
     app=app,
@@ -54,12 +54,77 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
-# ── GROQ CLIENT ────────────────────────────────────────
+# ── LLM CLIENTS — TRIPLE PROVIDER ──────────────────────
+# Groq (primary) → Together AI (fallback 1) → OpenRouter (fallback 2)
+# All use the same Llama 3.3 70B model for consistency.
 try:
-    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    groq_client = Groq(api_key=os.getenv("GROQ_API_KEY")) if os.getenv("GROQ_API_KEY") else None
 except Exception as e:
-    logger.error(f"Groq client init failed: {e}")
-    client = None
+    logger.error(f"Groq init failed: {e}")
+    groq_client = None
+
+try:
+    together_client = OpenAI(
+        api_key=os.getenv("TOGETHER_API_KEY", ""),
+        base_url="https://api.together.xyz/v1",
+    ) if os.getenv("TOGETHER_API_KEY") else None
+except Exception as e:
+    logger.error(f"Together AI init failed: {e}")
+    together_client = None
+
+try:
+    openrouter_client = OpenAI(
+        api_key=os.getenv("OPENROUTER_API_KEY", ""),
+        base_url="https://openrouter.ai/api/v1",
+    ) if os.getenv("OPENROUTER_API_KEY") else None
+except Exception as e:
+    logger.error(f"OpenRouter init failed: {e}")
+    openrouter_client = None
+
+GROQ_MODEL       = "llama-3.3-70b-versatile"
+TOGETHER_MODEL   = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct"
+
+
+def llm_call(messages: list, max_tokens: int = 1000, temperature: float = 0) -> str:
+    """
+    Unified LLM call with automatic triple-provider fallback.
+    Tries Groq → Together AI → OpenRouter in order.
+    Returns response content string. Raises RuntimeError if all fail.
+    """
+    providers = []
+    if groq_client:
+        providers.append(("Groq", groq_client, GROQ_MODEL))
+    if together_client:
+        providers.append(("Together AI", together_client, TOGETHER_MODEL))
+    if openrouter_client:
+        providers.append(("OpenRouter", openrouter_client, OPENROUTER_MODEL))
+
+    if not providers:
+        raise RuntimeError("No LLM provider configured.")
+
+    last_error = None
+    for name, provider, model in providers:
+        try:
+            resp = provider.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            if name != "Groq":
+                logger.info(f"LLM fallback used: {name}")
+            return resp.choices[0].message.content.strip()
+        except Exception as e:
+            err = str(e).lower()
+            if "429" in err or "rate_limit" in err or "rate limit" in err:
+                logger.warning(f"{name} rate limited — trying next provider")
+            else:
+                logger.warning(f"{name} failed ({e}) — trying next provider")
+            last_error = e
+            continue
+
+    raise RuntimeError(f"All LLM providers failed. Last error: {last_error}")
 
 # ── IN-MEMORY STATS ────────────────────────────────────
 # Resets on every Render restart (free tier spins down). Tracks activity
@@ -100,6 +165,31 @@ def force_https():
             return redirect(url, code=301)
 
 
+# ── SECURITY HEADERS ───────────────────────────────────
+@app.after_request
+def set_security_headers(response):
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self';"
+    )
+    if os.getenv('FLASK_ENV') == 'production':
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
+
+# ── 404 HANDLER ────────────────────────────────────────
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({'error': 'Not found'}), 404
+
+
 # ── KEYWORD EXTRACTION ─────────────────────────────────
 def extract_keywords(query: str) -> str:
     """
@@ -124,13 +214,12 @@ Output: climate change agricultural productivity Sub-Saharan Africa
 Now extract keywords for: "{query}"
 Output:"""
     try:
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        content = llm_call(
             messages=[{"role": "user", "content": prompt}],
-            temperature=0,
             max_tokens=60,
+            temperature=0,
         )
-        keywords = response.choices[0].message.content.strip().strip('"').strip("'")
+        keywords = content.strip('"').strip("'")
         print(f"Keywords extracted: {keywords}")
         return keywords
     except Exception as e:
@@ -159,76 +248,50 @@ def generate_search_strategy(topic: str) -> dict:
     """
     prompt = f"""You are an expert academic research librarian helping a student build a comprehensive literature review.
 
-Given this research topic, FIRST identify the topic type, then generate a multi-angle search strategy with up to 6 targeted search queries. Each query must serve a DIFFERENT purpose.
+Given this research topic, generate a multi-angle search strategy with up to 6 targeted search queries.
+Each query must serve a DIFFERENT purpose so the student gets broad, comprehensive coverage.
 
 Research topic: "{topic}"
 
-STEP 1 — Identify the topic type:
-- BIOMEDICAL/PHARMACOLOGICAL: contains drug names, compounds, animal models, diseases, biochemical mechanisms, lab methods (e.g. Y-maze, ELISA, PCR), species names
-- SCIENTIFIC (non-biomedical): physics, chemistry, engineering, environmental science
-- SOCIAL SCIENCE: sociology, psychology, economics, education, policy
-- LITERARY/HUMANITIES: novels, authors, literary theory, cultural analysis
-- MIXED: combines two or more of the above
+Generate queries for ALL applicable angles:
+1. EXACT TOPIC — search for the topic exactly as stated
+2. THEMATIC — search for the core themes/concepts in other literary texts or contexts (not just this specific work)
+3. WORK SPECIFIC — one query per named literary work, author, or text mentioned (if any)
+4. AUTHOR SCHOLARSHIP — search for academic papers written BY or ABOUT the named authors
+5. COMPARATIVE — search for papers comparing or contextualising the themes across similar works
+6. BROADER FIELD — search for foundational theory papers on the core concept (e.g. postcolonial theory, religious extremism in literature)
 
-STEP 2 — Generate angles based on type:
-
-FOR BIOMEDICAL/PHARMACOLOGICAL topics, generate ALL applicable angles from this list:
-1. EXACT TOPIC — the full specific topic as stated
-2. COMPOUND SYNONYMS — search using alternative names for the key compound/drug. CRITICAL: many compounds have multiple names (e.g. carnosic acid = rosemary extract = Rosmarinus officinalis; methotrexate = MTX; paracetamol = acetaminophen). Search for the synonym form that literature commonly uses.
-3. DRUG/COMPOUND MECHANISM — how does the key compound/drug work? (e.g. antioxidant mechanism, NF-kB pathway, oxidative stress)
-4. TOXICITY/DISEASE MODEL — search specifically for the injury or disease model (e.g. methotrexate-induced neurotoxicity, chemotherapy cognitive impairment)
-5. BEHAVIOURAL/ASSESSMENT MODEL — search for the specific test or model used (e.g. Y-maze spontaneous alternation, Morris water maze, open field test)
-6. BROADER NEUROPROTECTION/PHARMACOLOGY — search for the broader intervention category (e.g. natural compounds neuroprotection, plant extract cognitive impairment rodent)
-
-FOR LITERARY/HUMANITIES topics, generate:
-1. EXACT TOPIC
-2. THEMATIC — core themes across other works
-3. WORK SPECIFIC — one query per named work/author
-4. AUTHOR SCHOLARSHIP — papers about the named authors
-5. COMPARATIVE — cross-work comparisons
-6. BROADER FIELD — foundational theory
-
-FOR SOCIAL SCIENCE topics, generate:
-1. EXACT TOPIC
-2. CORE CONCEPT — the main phenomenon studied
-3. METHODOLOGY — research design or measurement approach used
-4. POPULATION/CONTEXT — the specific group or setting
-5. THEORETICAL FRAMEWORK — underlying theory
-6. RELATED EMPIRICAL — similar studies in adjacent populations
-
-RULES FOR ALL TYPES:
+RULES:
 - Each query must be meaningfully different — no near-duplicates
 - Keep queries concise and searchable (under 10 words each)
-- For biomedical topics: ALWAYS include at least one synonym/alternative-name angle — this is the most commonly missed angle and causes huge gaps in results
+- For literary topics, always include at least one work-specific and one thematic query
+- For social science topics, include methodology and theory queries
 - Maximum 6 queries total
 
 Return ONLY a valid JSON array. Each item must have:
-- "label": short descriptive name for this angle
-- "query": the actual search string
-- "keywords": 4-6 key terms from the query
-- "topic_type": one of "biomedical", "scientific", "social_science", "literary", "mixed"
+- "label": short name for this search angle (e.g. "Exact topic", "Radical faith in literature", "Obinna Udenwe's Satan and Shaitans")
+- "query": the full search string to use
+- "keywords": 4-6 key terms extracted from the query
 
-Example for "investigating the effect of oral carnosic acid supplementation on methotrexate-induced memory impairment in male Wistar rats using the Y-maze model":
+Example for "radical faith and manipulation in Obinna Udenwe's Satan and Shaitans and Elnathan John's Born on a Tuesday":
 [
-  {{"label": "Exact topic", "query": "carnosic acid methotrexate memory impairment Wistar rats Y-maze", "keywords": "carnosic acid methotrexate memory impairment rats", "topic_type": "biomedical"}},
-  {{"label": "Rosemary extract synonyms", "query": "rosemary extract Rosmarinus officinalis cognitive function neuroprotection rats", "keywords": "rosemary extract Rosmarinus officinalis cognitive neuroprotection", "topic_type": "biomedical"}},
-  {{"label": "Methotrexate neurotoxicity", "query": "methotrexate induced cognitive impairment neurotoxicity brain rats", "keywords": "methotrexate cognitive impairment neurotoxicity brain", "topic_type": "biomedical"}},
-  {{"label": "Carnosic acid neuroprotection mechanism", "query": "carnosic acid oxidative stress neuroprotection antioxidant brain", "keywords": "carnosic acid oxidative stress neuroprotection antioxidant", "topic_type": "biomedical"}},
-  {{"label": "Y-maze spatial memory rodents", "query": "Y-maze spontaneous alternation spatial memory rodent model", "keywords": "Y-maze spontaneous alternation spatial memory rodent", "topic_type": "biomedical"}},
-  {{"label": "Natural compounds chemotherapy cognitive impairment", "query": "natural compound plant extract chemotherapy cognitive impairment neuroprotection animal model", "keywords": "natural compound chemotherapy cognitive impairment neuroprotection", "topic_type": "biomedical"}}
+  {{"label": "Exact topic", "query": "radical faith political manipulation Nigerian fiction Udenwe Elnathan John", "keywords": "radical faith manipulation Nigerian fiction Udenwe Elnathan"}},
+  {{"label": "Radical faith in African literature", "query": "radical faith religious extremism African literature fiction", "keywords": "radical faith religious extremism African literature"}},
+  {{"label": "Obinna Udenwe Satan and Shaitans", "query": "Obinna Udenwe Satan Shaitans novel", "keywords": "Obinna Udenwe Satan Shaitans"}},
+  {{"label": "Elnathan John Born on a Tuesday", "query": "Elnathan John Born on a Tuesday novel", "keywords": "Elnathan John Born Tuesday novel"}},
+  {{"label": "Political manipulation Nigerian novels", "query": "political manipulation religion Nigerian contemporary fiction", "keywords": "political manipulation religion Nigerian fiction"}},
+  {{"label": "Postcolonial religion African fiction theory", "query": "postcolonial theory religion extremism African novel", "keywords": "postcolonial religion extremism African novel"}}
 ]
 
 Now generate the search strategy for: "{topic}"
 Return ONLY the JSON array. No explanation. No markdown. No backticks.
 """
     try:
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        raw = llm_call(
             messages=[{"role": "user", "content": prompt}],
-            temperature=0,
             max_tokens=800,
+            temperature=0,
         )
-        raw = response.choices[0].message.content.strip()
         raw = re.sub(r'```[a-z]*', '', raw)
         raw = re.sub(r'```', '', raw)
         raw = raw.strip()
@@ -547,14 +610,11 @@ Return ONLY the raw JSON array. No markdown, no backticks.
 Papers:
 {papers_text}"""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+    raw = llm_call(
         messages=[{"role": "user", "content": prompt}],
-        temperature=0,
         max_tokens=2000,
+        temperature=0,
     )
-
-    raw = response.choices[0].message.content.strip()
     raw = re.sub(r'^```[a-z]*\n?', '', raw)
     raw = re.sub(r'\n?```$', '', raw)
     match = re.search(r'\[.*\]', raw, re.DOTALL)
@@ -574,72 +634,28 @@ Papers:
     return enriched
 
 
-def is_niche_topic(topic: str) -> bool:
-    """
-    Detect whether a topic is highly specific/scientific.
-    Niche topics need a looser prefilter because relevant papers
-    may use synonyms or alternative nomenclature that don't appear
-    in the raw topic string.
-    Signals: chemical compound names, drug names, animal model names,
-    lab assay names, Latin species names, abbreviations.
-    """
-    niche_signals = [
-        # Animal models
-        r'\b(wistar|sprague|dawley|mice|mouse|rat|rats|murine|rodent|rabbit|zebra.?fish)\b',
-        # Lab methods / behavioural models
-        r'\b(y.maze|morris.water|open.field|forced.swim|elevated.plus|novel.object|radial.arm|barnes.maze|elisa|pcr|western.blot|immunohistochem|histopath)\b',
-        # Drug/compound indicators
-        r'\b(acid|oxide|amine|ase|ine|ol\b|ate\b|ium\b|ide\b)',
-        # Biomedical terminology
-        r'\b(induced|supplementation|administration|toxicity|neuroprotection|oxidative.stress|apoptosis|inflammation|cytokine|neurotoxic|hepatotoxic|nephrotoxic|cognitive|hippocampus|cortex|neuron)\b',
-        # Latin / scientific nomenclature
-        r'\b[A-Z][a-z]+ [a-z]+\b',  # e.g. Rosmarinus officinalis
-    ]
-    topic_lower = topic.lower()
-    hits = sum(1 for sig in niche_signals if re.search(sig, topic_lower))
-    return hits >= 2  # 2+ signals = treat as niche
-
-
-def prefilter_papers(topic: str, papers: list, strategy_queries: list = None) -> list:
+def prefilter_papers(topic: str, papers: list) -> list:
     """
     Fast keyword pre-filter — removes papers with zero topic signal
     before sending to the AI. No API calls, pure Python.
-
-    For broad topics: keeps papers where any meaningful topic term appears.
-    For niche/scientific topics: expands the term pool using all keywords
-    from the search strategy angles, so synonym-based papers (e.g. a paper
-    about 'rosemary extract' when the topic says 'carnosic acid') are kept.
+    Keeps papers where at least one meaningful topic term appears
+    in the title or abstract.
     """
+    # Extract meaningful terms from topic — words over 4 chars, skip filler
     stop = {'about','among','their','there','these','those','which','where',
             'using','study','analysis','effect','impact','influence','between',
             'university','undergraduate','students','research','papers','nigeria',
-            'nigerian','african','africa','investigate','investigating','effect',
-            'male','female','oral','model','induced','based'}
-
-    # Extract meaningful terms from the original topic
-    topic_terms = [w.lower() for w in re.split(r'\W+', topic)
-                   if len(w) > 3 and w.lower() not in stop]
-
-    # For niche topics: also pull all keywords from every search angle
-    # This gives us synonym coverage — angle 2 might have "rosemary extract"
-    # even though the topic only says "carnosic acid"
-    if is_niche_topic(topic) and strategy_queries:
-        for angle in strategy_queries:
-            kw_string = angle.get('keywords', '')
-            query_string = angle.get('query', '')
-            for word in re.split(r'\W+', kw_string + ' ' + query_string):
-                w = word.lower()
-                if len(w) > 3 and w not in stop:
-                    topic_terms.append(w)
-        topic_terms = list(set(topic_terms))
-        print(f"Niche topic detected — expanded prefilter pool to {len(topic_terms)} terms")
+            'nigerian','african','africa'}
+    topic_terms = [w.lower() for w in topic.split()
+                   if len(w) > 4 and w.lower() not in stop]
 
     if not topic_terms:
-        return papers
+        return papers  # can't filter — return all
 
     filtered = []
     for p in papers:
-        text = (p.get('title', '') + ' ' + p.get('abstract', '')).lower()
+        text = (p.get('title','') + ' ' + p.get('abstract','')).lower()
+        # Keep if any meaningful topic term appears
         if any(term in text for term in topic_terms):
             filtered.append(p)
 
@@ -667,8 +683,7 @@ def rank_papers_with_ai(topic: str, papers: list, strategy_queries: list = None)
     BATCH_SIZE = 10
 
     # Step 1 — Pre-filter: remove papers with no topic signal
-    # Pass strategy_queries so niche topics can use angle keywords as synonyms
-    papers = prefilter_papers(topic, papers, strategy_queries=strategy_queries or [])
+    papers = prefilter_papers(topic, papers)
 
     # Step 2 — Prioritise: exact/work-specific angles first
     papers = prioritise_papers(papers, strategy_queries or [])
@@ -769,8 +784,7 @@ def index():
 @limiter.limit("30 per hour")
 @limiter.limit("5 per minute")
 def search():
-    # Check Groq client is available
-    if client is None:
+    if groq_client is None and together_client is None and openrouter_client is None:
         return jsonify({'error': 'AI service unavailable. Please try again later.'}), 503
 
     data = request.get_json(silent=True)
@@ -868,8 +882,8 @@ def rate_limit_exceeded(e):
 def admin():
     key = request.args.get('key', '')
     admin_key = os.getenv('ADMIN_KEY', '')
-    if not admin_key or key != admin_key:
-        return '<h2 style="font-family:monospace;margin:2rem">401 — Not authorised.</h2>', 401
+    if not admin_key or not hmac.compare_digest(key, admin_key):
+        return jsonify({'error': 'Not authorised'}), 401
 
     with _stats_lock:
         total        = _stats["total_searches"]
@@ -938,6 +952,380 @@ def admin():
 </body>
 </html>"""
     return html
+
+
+# ── CITATION TOOL ──────────────────────────────────────
+def extract_metadata_from_pdf(pdf_bytes: bytes) -> dict:
+    """
+    Extract text from PDF and use AI to identify bibliographic metadata.
+    Returns dict with: title, authors, year, journal, volume, issue,
+    pages, doi, publisher, url, edition, location.
+    """
+    try:
+        import fitz  # PyMuPDF
+    except ImportError:
+        return {"error": "PyMuPDF not installed. Add 'pymupdf' to requirements.txt."}
+
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        # Extract first 3 pages — enough for title page + abstract + references header
+        text = ""
+        for i in range(min(3, len(doc))):
+            text += doc[i].get_text()
+        doc.close()
+        text = text[:4000]  # Cap tokens sent to AI
+    except Exception as e:
+        return {"error": f"Could not read PDF: {e}"}
+
+    prompt = f"""You are an expert bibliographer. Extract the complete bibliographic metadata from this academic document text.
+
+Document text (first pages):
+{text}
+
+Extract ALL of the following fields that are present. If a field is not found, use null.
+
+Return ONLY a valid JSON object with these exact keys:
+{{
+  "title": "full title of the work",
+  "authors": ["Author One", "Author Two"],
+  "year": "publication year as string",
+  "journal": "journal or book title",
+  "volume": "volume number",
+  "issue": "issue number",
+  "pages": "page range e.g. 123-145",
+  "doi": "DOI without https://doi.org/ prefix",
+  "publisher": "publisher name",
+  "url": "URL if present",
+  "edition": "edition if book",
+  "location": "publisher location if book",
+  "type": "article OR book OR chapter OR thesis OR conference OR website"
+}}
+
+Return ONLY the JSON object. No explanation. No markdown. No backticks."""
+
+    try:
+        raw = llm_call(
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=600,
+            temperature=0,
+        )
+        raw = re.sub(r'```[a-z]*', '', raw).replace('```', '').strip()
+        metadata = json.loads(raw)
+        return metadata
+    except Exception as e:
+        return {"error": f"Metadata extraction failed: {e}"}
+
+
+def resolve_doi_metadata(doi: str) -> dict:
+    """Fetch metadata directly from CrossRef using a DOI."""
+    try:
+        clean_doi = doi.replace("https://doi.org/", "").replace("http://doi.org/", "").strip()
+        r = requests.get(
+            f"https://api.crossref.org/works/{clean_doi}",
+            headers={"User-Agent": "Lumina/1.0 (lumina@research.app)"},
+            timeout=10,
+        )
+        if r.status_code != 200:
+            return {}
+        data = r.json().get("message", {})
+        authors = []
+        for a in data.get("author", [])[:6]:
+            name = f"{a.get('given', '')} {a.get('family', '')}".strip()
+            if name:
+                authors.append(name)
+        issued = data.get("issued", {}).get("date-parts", [[None]])
+        year = str(issued[0][0]) if issued and issued[0] and issued[0][0] else ""
+        journal = ""
+        container = data.get("container-title", [])
+        if container:
+            journal = container[0]
+        pages = data.get("page", "")
+        volume = data.get("volume", "")
+        issue = data.get("issue", "")
+        publisher = data.get("publisher", "")
+        title_list = data.get("title", [])
+        title = title_list[0] if title_list else ""
+        return {
+            "title": title,
+            "authors": authors,
+            "year": year,
+            "journal": journal,
+            "volume": volume,
+            "issue": issue,
+            "pages": pages,
+            "doi": clean_doi,
+            "publisher": publisher,
+            "url": f"https://doi.org/{clean_doi}",
+            "type": "article",
+        }
+    except Exception as e:
+        print(f"CrossRef DOI lookup failed: {e}")
+        return {}
+
+
+def format_citations(meta: dict) -> dict:
+    """
+    Generate citation strings in 5 academic styles from metadata dict.
+    Returns dict with keys: apa, mla, chicago, harvard, ieee, vancouver.
+    """
+    title   = meta.get("title", "Untitled")
+    authors = meta.get("authors", [])
+    year    = meta.get("year", "n.d.")
+    journal = meta.get("journal", "")
+    volume  = meta.get("volume", "")
+    issue   = meta.get("issue", "")
+    pages   = meta.get("pages", "")
+    doi     = meta.get("doi", "")
+    publisher = meta.get("publisher", "")
+    url     = meta.get("url", "")
+    edition = meta.get("edition", "")
+    location = meta.get("location", "")
+    doc_type = meta.get("type", "article")
+    access_date = datetime.now().strftime("%d %B %Y")
+
+    doi_str = f"https://doi.org/{doi}" if doi else url
+
+    def apa_author(name):
+        parts = name.strip().split()
+        if len(parts) >= 2:
+            last = parts[-1]
+            initials = " ".join(p[0].upper() + "." for p in parts[:-1])
+            return f"{last}, {initials}"
+        return name
+
+    def mla_author(name, index, total):
+        parts = name.strip().split()
+        if index == 0 and len(parts) >= 2:
+            return f"{parts[-1]}, {' '.join(parts[:-1])}"
+        return name
+
+    def chicago_author(name, index):
+        parts = name.strip().split()
+        if index == 0 and len(parts) >= 2:
+            return f"{parts[-1]}, {' '.join(parts[:-1])}"
+        return name
+
+    def harvard_author(name):
+        parts = name.strip().split()
+        if len(parts) >= 2:
+            last = parts[-1]
+            initials = "".join(p[0].upper() + "." for p in parts[:-1])
+            return f"{last}, {initials}"
+        return name
+
+    def ieee_author(name):
+        parts = name.strip().split()
+        if len(parts) >= 2:
+            initials = ". ".join(p[0].upper() for p in parts[:-1]) + "."
+            return f"{initials} {parts[-1]}"
+        return name
+
+    # ── APA 7th ────────────────────────────────────────
+    if authors:
+        if len(authors) == 1:
+            apa_auth = apa_author(authors[0])
+        elif len(authors) <= 20:
+            apa_auth = ", ".join(apa_author(a) for a in authors[:-1]) + f", & {apa_author(authors[-1])}"
+        else:
+            apa_auth = ", ".join(apa_author(a) for a in authors[:19]) + f", . . . {apa_author(authors[-1])}"
+    else:
+        apa_auth = "Unknown Author"
+
+    if doc_type == "article":
+        apa = f"{apa_auth} ({year}). {title}. *{journal}*"
+        if volume: apa += f", *{volume}*"
+        if issue:  apa += f"({issue})"
+        if pages:  apa += f", {pages}"
+        apa += "."
+        if doi_str: apa += f" {doi_str}"
+    else:
+        apa = f"{apa_auth} ({year}). *{title}*"
+        if edition: apa += f" ({edition} ed.)"
+        apa += f". {publisher}."
+        if doi_str: apa += f" {doi_str}"
+
+    # ── MLA 9th ────────────────────────────────────────
+    if authors:
+        if len(authors) == 1:
+            mla_auth = mla_author(authors[0], 0, 1)
+        elif len(authors) == 2:
+            mla_auth = f"{mla_author(authors[0], 0, 2)}, and {authors[1]}"
+        else:
+            mla_auth = f"{mla_author(authors[0], 0, len(authors))}, et al."
+    else:
+        mla_auth = "Unknown Author"
+
+    if doc_type == "article":
+        mla = f'{mla_auth}. "{title}." *{journal}*'
+        if volume: mla += f", vol. {volume}"
+        if issue:  mla += f", no. {issue}"
+        if year:   mla += f", {year}"
+        if pages:  mla += f", pp. {pages}"
+        mla += "."
+        if doi_str: mla += f" {doi_str}."
+    else:
+        mla = f'{mla_auth}. *{title}*.'
+        if edition: mla += f" {edition} ed.,"
+        mla += f" {publisher}, {year}."
+
+    # ── Chicago 17th (author-date) ──────────────────────
+    if authors:
+        if len(authors) == 1:
+            chi_auth = chicago_author(authors[0], 0)
+        elif len(authors) <= 3:
+            chi_auth = ", ".join(chicago_author(a, i) for i, a in enumerate(authors))
+            chi_auth = chi_auth.rsplit(", ", 1)
+            chi_auth = chi_auth[0] + ", and " + chi_auth[1] if len(chi_auth) > 1 else chi_auth[0]
+        else:
+            chi_auth = f"{chicago_author(authors[0], 0)} et al."
+    else:
+        chi_auth = "Unknown Author"
+
+    if doc_type == "article":
+        chicago = f'{chi_auth}. {year}. "{title}." *{journal}*'
+        if volume: chicago += f" {volume}"
+        if issue:  chicago += f" ({issue})"
+        if pages:  chicago += f": {pages}"
+        chicago += "."
+        if doi_str: chicago += f" {doi_str}."
+    else:
+        chicago = f"{chi_auth}. {year}. *{title}*."
+        if location and publisher: chicago += f" {location}: {publisher}."
+        elif publisher: chicago += f" {publisher}."
+
+    # ── Harvard ────────────────────────────────────────
+    if authors:
+        if len(authors) == 1:
+            harv_auth = harvard_author(authors[0])
+        elif len(authors) <= 3:
+            harv_auth = ", ".join(harvard_author(a) for a in authors[:-1]) + f" and {harvard_author(authors[-1])}"
+        else:
+            harv_auth = f"{harvard_author(authors[0])} et al."
+    else:
+        harv_auth = "Unknown Author"
+
+    if doc_type == "article":
+        harvard = f"{harv_auth} ({year}) '{title}', *{journal}*"
+        if volume: harvard += f", {volume}"
+        if issue:  harvard += f"({issue})"
+        if pages:  harvard += f", pp.{pages}"
+        harvard += "."
+        if doi_str: harvard += f" Available at: {doi_str} (Accessed: {access_date})."
+    else:
+        harvard = f"{harv_auth} ({year}) *{title}*."
+        if edition: harvard += f" {edition} edn."
+        if location and publisher: harvard += f" {location}: {publisher}."
+        elif publisher: harvard += f" {publisher}."
+
+    # ── IEEE ───────────────────────────────────────────
+    if authors:
+        ieee_auth = ", ".join(ieee_author(a) for a in authors[:6])
+        if len(authors) > 6: ieee_auth += " et al."
+    else:
+        ieee_auth = "Unknown Author"
+
+    ieee_num = "[1]"
+    if doc_type == "article":
+        ieee = f'{ieee_num} {ieee_auth}, "{title}," *{journal}*'
+        if volume: ieee += f", vol. {volume}"
+        if issue:  ieee += f", no. {issue}"
+        if pages:  ieee += f", pp. {pages}"
+        if year:   ieee += f", {year}"
+        ieee += "."
+        if doi_str: ieee += f" doi: {doi_str}."
+    else:
+        ieee = f'{ieee_num} {ieee_auth}, *{title}*.'
+        if edition: ieee += f" {edition} ed."
+        if location: ieee += f" {location}:"
+        if publisher: ieee += f" {publisher},"
+        if year: ieee += f" {year}."
+
+    # ── Vancouver ──────────────────────────────────────
+    def van_author(name):
+        parts = name.strip().split()
+        if len(parts) >= 2:
+            last = parts[-1]
+            initials = "".join(p[0].upper() for p in parts[:-1])
+            return f"{last} {initials}"
+        return name
+
+    if authors:
+        van_list = [van_author(a) for a in authors[:6]]
+        van_auth = ", ".join(van_list)
+        if len(authors) > 6: van_auth += ", et al."
+    else:
+        van_auth = "Unknown Author"
+
+    if doc_type == "article":
+        vancouver = f"{van_auth}. {title}. *{journal}*. {year}"
+        if volume: vancouver += f";{volume}"
+        if issue:  vancouver += f"({issue})"
+        if pages:  vancouver += f":{pages}"
+        vancouver += "."
+        if doi_str: vancouver += f" doi:{doi_str}."
+    else:
+        vancouver = f"{van_auth}. {title}."
+        if edition: vancouver += f" {edition} ed."
+        if location: vancouver += f" {location}:"
+        if publisher: vancouver += f" {publisher};"
+        if year: vancouver += f" {year}."
+
+    return {
+        "apa":       apa,
+        "mla":       mla,
+        "chicago":   chicago,
+        "harvard":   harvard,
+        "ieee":      ieee,
+        "vancouver": vancouver,
+    }
+
+
+@app.route('/cite', methods=['POST'])
+@limiter.limit("20 per hour")
+@limiter.limit("5 per minute")
+def cite():
+    """
+    Citation tool endpoint. Accepts:
+    - PDF file upload (multipart/form-data, field name: 'file')
+    - DOI string (JSON body: {"doi": "10.xxxx/xxxx"})
+    Returns structured metadata + citations in 6 formats.
+    """
+    # ── DOI input path ──────────────────────────────────
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        doi = sanitise_short(data.get("doi", ""), max_len=200)
+        if not doi:
+            return jsonify({"error": "No DOI provided"}), 400
+        meta = resolve_doi_metadata(doi)
+        if not meta:
+            return jsonify({"error": "Could not find paper with that DOI. Check the DOI and try again."}), 404
+        citations = format_citations(meta)
+        return jsonify({"metadata": meta, "citations": citations})
+
+    # ── PDF upload path ─────────────────────────────────
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded. Send a PDF as multipart/form-data with field name 'file'."}), 400
+
+    file = request.files['file']
+    if not file.filename:
+        return jsonify({"error": "Empty filename"}), 400
+
+    # Validate file type by content, not just extension
+    pdf_bytes = file.read(5)
+    if not pdf_bytes.startswith(b'%PDF'):
+        return jsonify({"error": "File does not appear to be a valid PDF."}), 400
+
+    # Read the rest
+    pdf_bytes = pdf_bytes + file.read()
+    if len(pdf_bytes) > 20 * 1024 * 1024:
+        return jsonify({"error": "PDF too large. Maximum size is 20MB."}), 413
+
+    meta = extract_metadata_from_pdf(pdf_bytes)
+    if "error" in meta:
+        return jsonify({"error": meta["error"]}), 500
+
+    citations = format_citations(meta)
+    return jsonify({"metadata": meta, "citations": citations})
 
 
 # ── HEALTH CHECK ───────────────────────────────────────

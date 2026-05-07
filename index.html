@@ -1229,6 +1229,133 @@
       margin-top: 6px;
       font-style: italic;
     }
+    /* CITATION TOOL */
+    .tool-tabs {
+      display: flex; gap: 0; max-width: 760px; margin: 0 auto 0;
+      border-bottom: 2px solid var(--ink); position: relative; z-index: 2;
+    }
+    .tool-tab {
+      padding: 10px 28px; font-family: 'Courier Prime', monospace; font-size: 0.85rem;
+      font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+      background: transparent; border: none; cursor: pointer; color: var(--ink-faint);
+      border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.15s;
+    }
+    .tool-tab.active { color: var(--ink); border-bottom-color: var(--ink); }
+    .tool-tab:hover:not(.active) { color: var(--ink-mid); }
+
+    .cite-panel {
+      display: none; max-width: 760px; margin: 0 auto; padding: 2rem 1.5rem 4rem;
+    }
+    .cite-panel.active { display: block; }
+
+    .cite-section-label {
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--ink-faint); margin-bottom: 0.5rem;
+    }
+    .cite-drop-zone {
+      border: 2px dashed var(--ink-faint); border-radius: 4px; padding: 2.5rem 1rem;
+      text-align: center; cursor: pointer; transition: all 0.15s; margin-bottom: 1.5rem;
+      background: var(--paper2);
+    }
+    .cite-drop-zone:hover, .cite-drop-zone.drag-over {
+      border-color: var(--ink); background: var(--paper3);
+    }
+    .cite-drop-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .cite-drop-text { font-size: 0.9rem; color: var(--ink-mid); }
+    .cite-drop-sub { font-size: 0.75rem; color: var(--ink-faint); margin-top: 0.25rem; }
+    #cite-file-input { display: none; }
+
+    .cite-divider {
+      display: flex; align-items: center; gap: 1rem; margin: 1.5rem 0;
+      color: var(--ink-faint); font-size: 0.8rem;
+    }
+    .cite-divider::before, .cite-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--ink-faint); opacity: 0.3;
+    }
+
+    .cite-doi-row {
+      display: flex; gap: 0.75rem; margin-bottom: 2rem;
+    }
+    .cite-doi-input {
+      flex: 1; padding: 0.65rem 0.9rem; border: 1.5px solid var(--ink-faint);
+      border-radius: 3px; font-family: 'Courier Prime', monospace; font-size: 0.9rem;
+      background: var(--paper2); color: var(--ink); outline: none;
+    }
+    .cite-doi-input:focus { border-color: var(--ink); }
+    .cite-doi-btn {
+      padding: 0.65rem 1.25rem; background: var(--ink); color: var(--paper);
+      border: none; border-radius: 3px; font-family: 'Courier Prime', monospace;
+      font-size: 0.85rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+    .cite-doi-btn:hover { opacity: 0.85; }
+    .cite-doi-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .cite-loading {
+      display: none; text-align: center; padding: 2rem; color: var(--ink-faint);
+      font-size: 0.9rem;
+    }
+    .cite-loading.active { display: block; }
+    .cite-loading-spinner {
+      font-size: 1.5rem; animation: spin 1s linear infinite; display: inline-block;
+      margin-bottom: 0.5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .cite-error {
+      display: none; background: #fef2f2; border: 1px solid #fca5a5;
+      border-radius: 4px; padding: 0.75rem 1rem; color: #991b1b;
+      font-size: 0.85rem; margin-bottom: 1rem;
+    }
+    .cite-error.active { display: block; }
+
+    .cite-results { display: none; }
+    .cite-results.active { display: block; }
+
+    .cite-meta-card {
+      background: var(--paper2); border: 1px solid var(--paper3);
+      border-radius: 4px; padding: 1.25rem; margin-bottom: 1.5rem;
+    }
+    .cite-meta-title { font-weight: 700; font-size: 1rem; margin-bottom: 0.4rem; }
+    .cite-meta-authors { font-size: 0.82rem; color: var(--ink-mid); margin-bottom: 0.2rem; }
+    .cite-meta-details { font-size: 0.78rem; color: var(--ink-faint); }
+
+    .cite-format-tabs {
+      display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;
+    }
+    .cite-format-btn {
+      padding: 5px 14px; border: 1.5px solid var(--ink-faint); border-radius: 20px;
+      font-family: 'Courier Prime', monospace; font-size: 0.78rem; font-weight: 700;
+      background: transparent; color: var(--ink-faint); cursor: pointer;
+      text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.12s;
+    }
+    .cite-format-btn.active {
+      background: var(--ink); color: var(--paper); border-color: var(--ink);
+    }
+    .cite-format-btn:hover:not(.active) { border-color: var(--ink); color: var(--ink); }
+
+    .cite-output-wrap {
+      background: var(--paper3); border: 1px solid var(--paper3);
+      border-radius: 4px; padding: 1rem 1.25rem; position: relative;
+    }
+    .cite-output-text {
+      font-size: 0.88rem; line-height: 1.7; color: var(--ink);
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .cite-copy-btn {
+      position: absolute; top: 0.75rem; right: 0.75rem;
+      padding: 4px 12px; background: var(--ink); color: var(--paper);
+      border: none; border-radius: 3px; font-size: 0.72rem; font-weight: 700;
+      cursor: pointer; font-family: 'Courier Prime', monospace;
+      text-transform: uppercase; letter-spacing: 0.05em; transition: opacity 0.15s;
+    }
+    .cite-copy-btn:hover { opacity: 0.8; }
+    .cite-copy-btn.copied { background: var(--stamp-green); }
+
+    .cite-note {
+      font-size: 0.72rem; color: var(--ink-faint); margin-top: 0.75rem;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -1276,6 +1403,15 @@
   </p>
 </div>
 
+<!-- TOOL TABS -->
+<div class="tool-tabs">
+  <button class="tool-tab active" id="tab-search" onclick="switchTab('search')">Search Papers</button>
+  <button class="tool-tab" id="tab-cite" onclick="switchTab('cite')">Citation Tool</button>
+</div>
+
+<!-- SEARCH PANEL -->
+<div id="panel-search">
+
 <!-- SEARCH -->
 <div class="search-wrap">
   <div class="search-label">→ What are you researching?</div>
@@ -1295,6 +1431,60 @@
           fill="#f2ece0"/>
   </svg>
 </div>
+
+</div><!-- end panel-search -->
+
+<!-- CITATION PANEL -->
+<div id="panel-cite" class="cite-panel">
+
+  <div class="cite-section-label">Upload a PDF</div>
+  <div class="cite-drop-zone" id="cite-drop-zone" onclick="document.getElementById('cite-file-input').click()">
+    <div class="cite-drop-icon">📄</div>
+    <div class="cite-drop-text">Drop your PDF here or click to browse</div>
+    <div class="cite-drop-sub">Supports PDF up to 20MB · We read the metadata, not the full paper</div>
+  </div>
+  <input type="file" id="cite-file-input" accept=".pdf,application/pdf" onchange="handleFileSelect(this)"/>
+
+  <div class="cite-divider">or enter a DOI</div>
+
+  <div class="cite-doi-row">
+    <input class="cite-doi-input" type="text" id="cite-doi-input"
+      placeholder="e.g. 10.1038/nature12373"
+      autocomplete="off"/>
+    <button class="cite-doi-btn" id="cite-doi-btn" onclick="citeDOI()">Get Citation →</button>
+  </div>
+
+  <div class="cite-loading" id="cite-loading">
+    <div class="cite-loading-spinner">⟳</div>
+    <div>Reading paper and generating citations...</div>
+  </div>
+
+  <div class="cite-error" id="cite-error"></div>
+
+  <div class="cite-results" id="cite-results">
+    <div class="cite-meta-card" id="cite-meta-card"></div>
+
+    <div class="cite-section-label" style="margin-bottom:0.75rem">Select citation format</div>
+    <div class="cite-format-tabs" id="cite-format-tabs">
+      <button class="cite-format-btn active" onclick="selectFormat('apa', this)">APA 7th</button>
+      <button class="cite-format-btn" onclick="selectFormat('mla', this)">MLA 9th</button>
+      <button class="cite-format-btn" onclick="selectFormat('chicago', this)">Chicago 17th</button>
+      <button class="cite-format-btn" onclick="selectFormat('harvard', this)">Harvard</button>
+      <button class="cite-format-btn" onclick="selectFormat('ieee', this)">IEEE</button>
+      <button class="cite-format-btn" onclick="selectFormat('vancouver', this)">Vancouver</button>
+    </div>
+
+    <div class="cite-output-wrap">
+      <div class="cite-output-text" id="cite-output-text"></div>
+      <button class="cite-copy-btn" id="cite-copy-btn" onclick="copyCitation()">Copy</button>
+    </div>
+    <div class="cite-note">
+      Always verify citations against the original source. AI-extracted metadata may contain errors,
+      especially for older papers or unusual formats.
+    </div>
+  </div>
+
+</div><!-- end panel-cite -->
 
 <!-- LOADING -->
 <div class="loading" id="loading">
@@ -1341,8 +1531,8 @@
 <!-- ERROR -->
 <div class="error-msg" id="error-msg">
   <div class="error-glyph">✗</div>
-  <div class="error-title" id="error-title">Something went wrong.</div>
-  <div class="error-sub" id="error-sub">Please try again in a moment.</div>
+  <div class="error-title" id="error-title">Something broke.</div>
+  <div class="error-sub" id="error-sub">Make sure app.py is running on port 5001.</div>
 </div>
 
 <!-- RESULTS -->
@@ -1410,7 +1600,7 @@ function srcClass(s) {
 
 function scoreClass(s) { return s >= 8 ? 'high' : s >= 5 ? 'mid' : 'low'; }
 
-let allPapers = [], shownCount = 0, filteredPapers = null;
+let allPapers = [], shownCount = 0, filteredPapers = null, hasSearchResults = false;
 const PAGE = 8;
 
 async function doSearch() {
@@ -1425,6 +1615,7 @@ async function doSearch() {
   btn.disabled = true;
   loading.classList.add('active');
   section.style.display = 'none';
+  hasSearchResults = false;
   el.innerHTML = '';
   err.classList.remove('active');
   document.getElementById('filter-bar').classList.remove('visible');
@@ -1453,23 +1644,7 @@ async function doSearch() {
       btn.disabled = false;
       return;
     }
-    // Handle Groq / Together AI rate limit returned as 503 or other non-ok status
-    if (!res.ok) {
-      loading.classList.remove('active');
-      stopProgress();
-      stopDots();
-      const errorType = data?.error || '';
-      const isRateLimit = errorType === 'rate_limit' || res.status === 503;
-      document.getElementById('error-title').textContent = isRateLimit
-        ? 'AI service is busy.'
-        : 'Something went wrong.';
-      document.getElementById('error-sub').textContent = isRateLimit
-        ? 'The AI provider has hit its rate limit. Try again in a minute — or wait a few minutes if the issue persists.'
-        : 'Please try again in a moment.';
-      err.classList.add('active');
-      btn.disabled = false;
-      return;
-    }
+    if (!res.ok) throw new Error(data.error || 'Unknown error');
     loading.classList.remove('active');
     stopProgress();
     stopDots();
@@ -1533,13 +1708,12 @@ async function doSearch() {
     }
 
     section.style.display = 'block';
+    hasSearchResults = true;
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  } catch (e) {
+  } catch {
     loading.classList.remove('active');
     stopProgress();
     stopDots();
-    document.getElementById('error-title').textContent = 'Something went wrong.';
-    document.getElementById('error-sub').textContent = 'Please try again in a moment.';
     err.classList.add('active');
   } finally {
     btn.disabled = false;
@@ -1947,8 +2121,165 @@ function stopDots() {
 
 initCareers();
 setInterval(() => showCareer((currentCareer + 1) % careers.length), 4000);
-// Build game grid on page load so it works before any search
 startTrivia();
+
+// ── CITATION TOOL ────────────────────────────────────
+let currentCitations = {};
+let currentFormat = 'apa';
+
+function switchTab(tab) {
+  const searchPanel = document.getElementById('panel-search');
+  const citePanel   = document.getElementById('panel-cite');
+  const loading     = document.getElementById('loading');
+  const results     = document.getElementById('results-section');
+  const errMsg      = document.getElementById('error-msg');
+
+  if (tab === 'cite') {
+    // Hide search panel and any search state
+    searchPanel.style.display = 'none';
+    if (loading)  loading.classList.remove('active');
+    if (results)  results.style.display = 'none';
+    if (errMsg)   errMsg.classList.remove('active');
+    // Show citation panel
+    citePanel.style.display = 'block';
+  } else {
+    // Show search panel
+    searchPanel.style.display = '';
+    citePanel.style.display   = 'none';
+    // Restore results if they were showing before
+    if (results && hasSearchResults) {
+      results.style.display = 'block';
+    }
+  }
+
+  document.getElementById('tab-search').classList.toggle('active', tab === 'search');
+  document.getElementById('tab-cite').classList.toggle('active', tab === 'cite');
+}
+
+// Drag and drop
+const dropZone = document.getElementById('cite-drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processCiteFile(file);
+});
+
+function handleFileSelect(input) {
+  const file = input.files[0];
+  if (file) processCiteFile(file);
+}
+
+function processCiteFile(file) {
+  if (!file.type.includes('pdf') && !file.name.toLowerCase().endsWith('.pdf')) {
+    showCiteError('Please upload a PDF file.');
+    return;
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    showCiteError('File too large. Maximum size is 20MB.');
+    return;
+  }
+  const formData = new FormData();
+  formData.append('file', file);
+  runCiteRequest(fetch('/cite', { method: 'POST', body: formData }));
+}
+
+function citeDOI() {
+  const doi = document.getElementById('cite-doi-input').value.trim();
+  if (!doi) { showCiteError('Please enter a DOI.'); return; }
+  // Strip full URL if pasted
+  const clean = doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '');
+  runCiteRequest(fetch('/cite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ doi: clean }),
+  }));
+}
+
+async function runCiteRequest(fetchPromise) {
+  setCiteLoading(true);
+  hideCiteError();
+  document.getElementById('cite-results').classList.remove('active');
+  document.getElementById('cite-doi-btn').disabled = true;
+
+  try {
+    const res = await fetchPromise;
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      showCiteError(data.error || 'Something went wrong. Please try again.');
+      return;
+    }
+    currentCitations = data.citations;
+    renderCiteResults(data.metadata, data.citations);
+  } catch (e) {
+    showCiteError('Could not reach the server. Please try again.');
+  } finally {
+    setCiteLoading(false);
+    document.getElementById('cite-doi-btn').disabled = false;
+  }
+}
+
+function renderCiteResults(meta, citations) {
+  // Metadata card
+  const authors = (meta.authors || []).slice(0, 3).join(', ') + (meta.authors && meta.authors.length > 3 ? ' et al.' : '');
+  const details = [meta.journal, meta.year, meta.volume ? `Vol. ${meta.volume}` : '', meta.pages ? `pp. ${meta.pages}` : ''].filter(Boolean).join(' · ');
+  document.getElementById('cite-meta-card').innerHTML = `
+    <div class="cite-meta-title">${meta.title || 'Untitled'}</div>
+    <div class="cite-meta-authors">${authors || 'Unknown authors'}</div>
+    <div class="cite-meta-details">${details}</div>
+    ${meta.doi ? `<div class="cite-meta-details" style="margin-top:4px"><a href="https://doi.org/${meta.doi}" target="_blank" rel="noopener noreferrer" style="color:inherit">doi.org/${meta.doi}</a></div>` : ''}
+  `;
+
+  // Show active format
+  selectFormat(currentFormat, document.querySelector('.cite-format-btn.active'));
+  document.getElementById('cite-results').classList.add('active');
+}
+
+function selectFormat(format, btn) {
+  currentFormat = format;
+  // Update button active state
+  document.querySelectorAll('.cite-format-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  // Render citation text — strip markdown italics for display
+  const text = (currentCitations[format] || '').replace(/\*(.*?)\*/g, '$1');
+  document.getElementById('cite-output-text').textContent = text;
+  // Reset copy button
+  const copyBtn = document.getElementById('cite-copy-btn');
+  copyBtn.textContent = 'Copy';
+  copyBtn.classList.remove('copied');
+}
+
+function copyCitation() {
+  const text = document.getElementById('cite-output-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('cite-copy-btn');
+    btn.textContent = 'Copied ✓';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function setCiteLoading(on) {
+  document.getElementById('cite-loading').classList.toggle('active', on);
+}
+
+function showCiteError(msg) {
+  const el = document.getElementById('cite-error');
+  el.textContent = msg;
+  el.classList.add('active');
+}
+
+function hideCiteError() {
+  document.getElementById('cite-error').classList.remove('active');
+}
+
+// Enter key on DOI input
+document.getElementById('cite-doi-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') citeDOI();
+});
+
 
 </script>
 </body>

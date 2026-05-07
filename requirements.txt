@@ -4,3 +4,4 @@ groq
 python-dotenv
 requests
 flask-limiter
+pymupdf
