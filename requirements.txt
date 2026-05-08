@@ -1,7 +1,9 @@
 flask
 flask-cors
 groq
+openai
 python-dotenv
 requests
 flask-limiter
 pymupdf
+gunicorn
